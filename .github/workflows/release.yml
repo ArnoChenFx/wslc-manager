@@ -39,16 +39,38 @@ jobs:
           cache: true
 
       # mygo build still succeeds without the signing key; it just skips the
-      # update files, quietly. Stop here instead, before anything is built or
+      # update files, quietly. Worse, it signs with whatever key it is given,
+      # so a key that does not belong to the public key built into the app
+      # publishes a release that every installed app refuses to install,
+      # without a single error here. Stop before anything is built or
       # published, with a message that says what to do.
       - name: Check the update signing key
         shell: pwsh
         env:
           MYGO_UPDATER_PRIVATE_KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
         run: |
-          if (-not $env:MYGO_UPDATER_PRIVATE_KEY) {
-            Write-Host "::error title=Missing update signing key::Add the repository secret MYGO_UPDATER_PRIVATE_KEY (the contents of mygo-update.key). Without it this release cannot be updated to."
+          function Fail($title, $message) {
+            Write-Host "::error title=$title::$message"
             exit 1
+          }
+
+          $secret = "$env:MYGO_UPDATER_PRIVATE_KEY".Trim()
+          if (-not $secret) {
+            Fail "Missing update signing key" "Add the repository secret MYGO_UPDATER_PRIVATE_KEY (the contents of mygo-update.key). Without it this release cannot be updated to."
+          }
+
+          # A private key is the 32-byte seed followed by its 32-byte public
+          # key, so the public half can be read straight out of the secret and
+          # compared with the one in mygo.json, which is what the app trusts.
+          try { $bytes = [Convert]::FromBase64String($secret) }
+          catch { Fail "Bad update signing key" "MYGO_UPDATER_PRIVATE_KEY is not base64. Paste the whole contents of mygo-update.key." }
+          if ($bytes.Length -ne 64) {
+            Fail "Bad update signing key" "MYGO_UPDATER_PRIVATE_KEY decodes to $($bytes.Length) bytes, a private key has 64. Did you paste mygo-update.pub?"
+          }
+          $derived = [Convert]::ToBase64String([byte[]]$bytes[32..63])
+          $configured = (Get-Content mygo.json -Raw | ConvertFrom-Json).updates.publicKey
+          if ($derived -cne $configured) {
+            Fail "Wrong update signing key" "MYGO_UPDATER_PRIVATE_KEY is not the private half of updates.publicKey in mygo.json. Use the mygo-update.key that was generated with it."
           }
 
       - name: Enable cgo

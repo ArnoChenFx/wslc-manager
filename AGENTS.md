@@ -92,7 +92,9 @@ internal/selfupdate → 只封装 MyGo 的更新插件（注册、读状态、�
   本机在 `%APPDATA%\mygo\update-keys\wslc-manager\mygo-update.key`，CI 里是仓库
   secret `MYGO_UPDATER_PRIVATE_KEY`。丢了私钥，已安装的程序就再也收不到更新，
   请另存一份到密码管理器。
-- `release.yml` 缺私钥会直接失败；会校验更新文件与 tag 一致；先建草稿、传完再公开
+- `release.yml` 缺私钥、或私钥与 `mygo.json` 里的公钥不配对，都会在第一步直接失败
+  （签名用任何密钥都能成功，配错了会发出所有已装程序都拒收的更新）；
+  会校验更新文件与 tag 一致；先建草稿、传完再公开
   （应用从「最新发布」读 manifest，不能让它早于更新包可见）。
   改动它之前先跑 `go test ./internal/selfupdate/`，契约测试会指出哪条约定被破坏。
 - 第一个带自更新的版本只能让**之后**的版本被更新到；已装的旧版（没有更新插件）
