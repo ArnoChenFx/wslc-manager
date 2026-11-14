@@ -74,6 +74,7 @@ func (a *App) projectListPane(c *ui.Context) {
 		a.projectList.Selected = &a.projectSel
 		a.projectList.RoundRows = true
 		styleRows(&a.projectList, t)
+		syncRowSelection(&a.projectList, a.projectSel)
 
 		ui.List(c, &a.projectList, len(rows), func(i int) {
 			p := rows[i]
@@ -333,6 +334,7 @@ func (a *App) serviceTable(c *ui.Context, p compose.Project) {
 	a.serviceList.Selected = &a.serviceSel
 	a.serviceList.RoundRows = true
 	styleRows(&a.serviceList, t)
+	syncRowSelection(&a.serviceList, a.serviceSel)
 
 	table := ui.Table(c, &a.serviceList, cols, len(names), func(row, col int) {
 		if row < 0 || row >= len(names) {

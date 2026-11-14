@@ -10,6 +10,7 @@ package app
 //     背景与文字保持中性灰，避免整屏被颜色淹没。
 
 import (
+	"math"
 	"strconv"
 	"strings"
 
@@ -33,8 +34,8 @@ type accentChoice struct {
 // 第一个是默认值（品红）。命名用颜色语言而不是「蓝/红」，
 // 免得翻译时出现「Blue」这种只对一半语言准确的词。
 var accentPalette = []accentChoice{
-	{Key: "magenta", Dark: "#e5357d", Light: "#d62a70"},
-	{Key: "violet", Dark: "#8b5cf6", Light: "#7c3aed"},
+	{Key: "magenta", Dark: "#ee458c", Light: "#d62a70"},
+	{Key: "violet", Dark: "#9d74f8", Light: "#7c3aed"},
 	{Key: "blue", Dark: "#3b82f6", Light: "#2563eb"},
 	{Key: "teal", Dark: "#14b8a6", Light: "#0d9488"},
 	{Key: "amber", Dark: "#f59e0b", Light: "#d97706"},
@@ -106,13 +107,56 @@ func (a accentChoice) color(dark bool) ui.Color {
 	return ui.Hex(hex)
 }
 
+// textOnAccent 返回压在强调色上最清晰的前景色（白或近黑）。
+//
+// 判据用 WCAG 的相对亮度而非简单的 R+G+B：后者对绿色严重低估，
+// 例如 #22c55e 的算术均值不低，但它其实非常亮。
+func textOnAccent(c ui.Color) ui.Color {
+	light := ui.Hex("#ffffff")
+	dark := ui.Hex("#101614")
+
+	// 哪个对比度高就用哪个，避免硬编码阈值带来的边界误判。
+	if ratioOf(dark, c) >= ratioOf(light, c) {
+		return dark
+	}
+	return light
+}
+
+// ratioOf 返回两色的 WCAG 对比度，用于挑选前景色。
+func ratioOf(a, b ui.Color) float64 {
+	la, lb := relLuminance(a), relLuminance(b)
+	if la < lb {
+		la, lb = lb, la
+	}
+	return (la + 0.05) / (lb + 0.05)
+}
+
+// relLuminance 计算 WCAG 2.x 的相对亮度。
+func relLuminance(c ui.Color) float64 {
+	lin := func(v uint8) float64 {
+		f := float64(v) / 255
+		if f <= 0.03928 {
+			return f / 12.92
+		}
+		return math.Pow((f+0.055)/1.055, 2.4)
+	}
+	return 0.2126*lin(c.R) + 0.7152*lin(c.G) + 0.0722*lin(c.B)
+}
+
 // applyAccent 把一个预设应用到主题上，派生悬停/按下/焦点等颜色。
 func applyAccent(t *ui.Theme, choice accentChoice) {
 	c := choice.color(t.Dark)
 	t.Accent = c
 	t.AccentHover = c.Mix(ui.Hex("#ffffff"), 0.16)
 	t.AccentPressed = c.Mix(ui.Hex("#000000"), 0.16)
-	t.AccentText = ui.Hex("#ffffff")
+
+	// 按钮/选中项上的文字颜色按强调色亮度决定。
+	//
+	// 一律用白字是错的：青绿 (#14b8a6)、琥珀 (#f59e0b)、绿 (#22c55e)
+	// 这些亮色的相对亮度很高，白字压上去对比度只有 2.1–2.5，
+	// 远低于 WCAG 的 3.0，实测就是「按钮上的字看不清」。
+	// 亮色改用近黑深字，深色仍用白字。
+	t.AccentText = textOnAccent(c)
 
 	// 焦点环与文本选中跟着强调色走，保证整体一致。
 	t.Focus = c.Alpha(0.62)

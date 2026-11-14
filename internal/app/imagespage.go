@@ -117,14 +117,18 @@ func (a *App) imageTable(c *ui.Context, rows []wslc.Image) {
 	a.imageList.Selected = &a.imageSel
 	a.imageList.RoundRows = true
 	styleRows(&a.imageList, t)
+	syncRowSelection(&a.imageList, a.imageSel)
 
 	table := ui.Table(c, &a.imageList, cols, len(rows), func(row, col int) {
 		if row < 0 || row >= len(rows) {
 			return
 		}
 		img := rows[row]
-		// 选中行只叠淡蓝，文字保持正常前景色即可。
+		// 选中行底色带强调色，次要文字需提亮才看得清。
 		muted := t.TextMuted
+		if a.imageList.CellSelected(row, col) {
+			muted = t.Text
+		}
 		switch col {
 		case 0:
 			repo := img.Repository

@@ -170,6 +170,7 @@ func (a *App) containerTable(c *ui.Context, rows []wslc.Container) {
 	a.containerList.Selected = &a.containerSel
 	a.containerList.RoundRows = true
 	styleRows(&a.containerList, t)
+	syncRowSelection(&a.containerList, a.containerSel)
 
 	table := ui.Table(c, &a.containerList, cols, len(rows), func(row, col int) {
 		if row < 0 || row >= len(rows) {
@@ -177,11 +178,14 @@ func (a *App) containerTable(c *ui.Context, rows []wslc.Container) {
 		}
 		ct := rows[row]
 
-		// 选中行只是叠了一层很淡的蓝（见 styleRows），文字仍用正常前景色。
-		// 早先选中行铺满强调色时才需要换成 AccentText，现在不必——
-		// 白字压在淡蓝上反而更难读。
+		// 选中行的底色带一点强调色（见 styleRows），比普通行更亮/更暗。
+		// 次要文字（TextMuted）压在上面会明显发灰、看不清，
+		// 所以选中时改用正常前景色——这是实测截图确认过的问题。
 		selected := a.containerList.CellSelected(row, col)
 		muted := t.TextMuted
+		if selected {
+			muted = t.Text
+		}
 
 		switch col {
 		case 0:

@@ -100,18 +100,23 @@ func (a *App) applyTheme(c *ui.Context) {
 
 // rowSelection 返回列表/表格「选中行」的底色。
 //
-// 关键取舍：**不用**强调色整行填充。
-// 满饱和的蓝色铺满一整行时，文字可读性下降，整屏看起来像被涂色块，
-// 而且会与真正需要突出的元素（主按钮、错误提示）抢注意力。
-// 这里改用强调色的低透明度叠加：像蒙了一层薄雾，
-// 眼睛能立刻找到选中行，但文字仍然是普通前景色。
-func rowSelection(t *ui.Theme) ui.Color {
-	if t.Dark {
-		// 品红的低透明叠加：像蒙了一层淡粉色，
-		// 一眼能看出选中，又不至于抢走文字的对比度。
-		return ui.RGBA(229, 53, 125, 0.26)
+// 关键取舍：**不用**强调色整行填充，也不返回半透明色。
+//
+// 半透明色的问题：MyGo 把 CellsStyle.Row 直接当背景填充，
+// 是否与下层混合取决于绘制路径；实测在青绿等亮色强调下
+// 会得到饱和色块，灰色文字压上去几乎看不清（用户截图确认过）。
+//
+// 所以这里返回一个**不透明的、与背景预混合过的**深色：
+// 由背景色与强调色按固定比例调出来，结果可控、可预测，
+// 且保证次要文字（TextMuted）仍有足够对比度。
+func rowSelection(t *ui.Theme, accent ui.Color) ui.Color {
+	// 强调色只占一小部分，主要是让选中行「带一点色彩的暗示」。
+	const mix = 0.16
+	base := t.Background
+	if !t.Dark {
+		base = t.Surface
 	}
-	return ui.RGBA(214, 42, 112, 0.13)
+	return base.Mix(accent, mix)
 }
 
 // cursorBorder 返回表格里「光标所在格」的描边色。
@@ -130,9 +135,42 @@ func cursorBorder(t *ui.Theme) ui.Color {
 // 而不是在 New 里统一设置：主题可能随系统外观变化，配色需要在
 // 每一帧按当前主题重算，否则切换深/浅色后选中行颜色会留在旧值。
 func styleRows(s *ui.ListState, t *ui.Theme) {
+	// 让 CellsStyle 真正生效需要两个条件，缺一不可：
+	//   1. CellSelect = true
+	//   2. Selection != nil
+	// MyGo 判定「选单元格模式」的条件是 `CellSelect && Selection != nil`；
+	// 少了任何一个，全部退回到 t.Accent 整行填充——
+	// 那正是「选中行一大坨饱和色、文字糊在里面」的根源（截图确认过）。
+	//
+	// All: true 表示整行一起选，而不是逐单元格，
+	// 保持和之前一样的行选体验。
+	s.CellSelect = true
+	// 还需要一个非 nil 的 Selection：MyGo 判定「选单元格模式」的条件是
+	// `CellSelect && Selection != nil`，少了它 CellsStyle 不生效，
+	// 会退回 t.Accent 整行填充（文字糊成一片的根源）。
+	//
+	// 这里不引入多选：syncRowSelection 每帧把 Selection 收紧成
+	// 当前 Selected 的那一项，对外仍是单选行为。
+	// 键类型必须与 ListState.Key 的返回值一致（各页面返回的是字符串 ID），
+	// 否则 MyGo 会在运行时 panic：key 类型与 Selection 不匹配。
+	if s.Selection == nil {
+		s.Selection = &ui.Selection[string]{}
+	}
+
+	// 三个颜色分工：
+	//   Cell  —— 选中行里的单元格（会盖在 Row 之上）
+	//   Row   —— 选中行的其余部分（行间隙、内边距）
+	//   CellText —— 单元格文字
+	//
+	// Cell 必须显式给值。留空时 MyGo 会回退到 t.Accent 整片填充，
+	// 那正是「选中行变成一大块饱和色、文字糊在里头」的原因
+	// （用户截图确认过）。这里令 CellText 与主题前景色一致，
+	// 因此 Cell 只需与 Row 稍有区别即可，不必再反色。
+	bg := rowSelection(t, t.Accent)
 	s.CellsStyle = ui.CellsStyle{
-		// Cell 留空：让「光标所在格」沿用选中行底色，只靠描边区分。
-		Row: rowSelection(t),
+		Cell:     bg,
+		Row:      bg,
+		CellText: t.Text,
 		// 斑马纹：极淡，只用来帮助横向对齐，不喧宾夺主。
 		Stripe: stripeFill(t),
 	}
@@ -144,4 +182,27 @@ func stripeFill(t *ui.Theme) ui.Color {
 		return ui.RGBA(255, 255, 255, 0.022)
 	}
 	return ui.RGBA(0, 0, 0, 0.016)
+}
+
+// syncRowSelection 让 UI 的多选容器始终只包含当前选中项。
+//
+// 为什么需要：为了启用 CellsStyle（自定义选中行配色），
+// 必须给 ListState.Selection 一个非 nil 值，而它天生是多选的。
+// 本应用所有列表都是单选，所以每帧把多余的选择清掉，
+// 保证行为与视觉都还是「只选中一行」。
+//
+// 键取自 ListState.Key，与 Selection 的键类型保持一致，
+// 否则 MyGo 会在运行时 panic（"a row's key is a string, not the int"）。
+func syncRowSelection(s *ui.ListState, selected int) {
+	sel, ok := s.Selection.(*ui.Selection[string])
+	if !ok || sel == nil || s.Key == nil {
+		return
+	}
+	sel.Clear()
+	if selected < 0 {
+		return
+	}
+	if k, ok := s.Key(selected).(string); ok {
+		sel.Add(k)
+	}
 }

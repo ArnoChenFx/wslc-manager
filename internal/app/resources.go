@@ -63,14 +63,18 @@ func (a *App) volumesPage(c *ui.Context) {
 		a.volumeList.Selected = &a.volumeSel
 		a.volumeList.RoundRows = true
 		styleRows(&a.volumeList, t)
+		syncRowSelection(&a.volumeList, a.volumeSel)
 
 		ui.Table(c, &a.volumeList, cols, len(rows), func(row, col int) {
 			if row < 0 || row >= len(rows) {
 				return
 			}
 			v := rows[row]
-			// 选中行只叠淡蓝，不需要把文字改成反色。
+			// 选中行底色带强调色，次要文字需提亮才看得清。
 			muted := t.TextMuted
+			if a.volumeList.CellSelected(row, col) {
+				muted = t.Text
+			}
 			switch col {
 			case 0:
 				ui.Text(c, v.Name).SingleLine()
@@ -185,14 +189,18 @@ func (a *App) networksPage(c *ui.Context) {
 		a.networkList.Selected = &a.networkSel
 		a.networkList.RoundRows = true
 		styleRows(&a.networkList, t)
+		syncRowSelection(&a.networkList, a.networkSel)
 
 		ui.Table(c, &a.networkList, cols, len(rows), func(row, col int) {
 			if row < 0 || row >= len(rows) {
 				return
 			}
 			n := rows[row]
-			// 选中行只叠淡蓝，不需要把文字改成反色。
+			// 选中行底色带强调色，次要文字需提亮才看得清。
 			muted := t.TextMuted
+			if a.volumeList.CellSelected(row, col) {
+				muted = t.Text
+			}
 			switch col {
 			case 0:
 				ui.Text(c, n.Name).SingleLine()
