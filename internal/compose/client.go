@@ -102,6 +102,10 @@ type ActionOptions struct {
 	EnvFile string
 	// Files 显式指定 compose 文件（-f）；为空则在项目目录里自动探测。
 	Files []string
+	// All 用于 ps：包含已停止的容器。
+	All bool
+	// DryRun 为 true 时只打印将要执行的 wslc 命令，不改动任何东西（查询类命令照常执行）。
+	DryRun bool
 }
 
 func (o ActionOptions) stopTimeout() int {
@@ -140,20 +144,24 @@ func (c *Client) Load(ctx context.Context, o LoadOptions) (Project, error) {
 	return projectView(p, o.Dir, o.EnvFile, warnings), nil
 }
 
-// ConfigYAML 返回解析后的完整配置（YAML），等价于 `docker compose config`。
-func (c *Client) ConfigYAML(ctx context.Context, dir string, o ActionOptions) (string, error) {
+// ConfigYAML 返回解析后的完整配置（YAML），等价于 `docker compose config`，
+// 以及加载时发现的告警（wslc 做不到而被忽略的设置）。
+//
+// 告警单独返回而不是混进 YAML：YAML 是要被别的程序读的，告警是给人看的。
+func (c *Client) ConfigYAML(ctx context.Context, dir string, o ActionOptions) (yaml string, warnings []string, err error) {
 	p, err := loadProject(ctx, optsFor(dir, o))
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
-	if _, err := checkProject(p); err != nil {
-		return "", err
+	warnings, err = checkProject(p)
+	if err != nil {
+		return "", nil, err
 	}
 	out, err := p.MarshalYAML()
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
-	return string(out), nil
+	return string(out), warnings, nil
 }
 
 func optsFor(dir string, o ActionOptions) LoadOptions {
@@ -260,7 +268,7 @@ func (c *Client) execute(ctx context.Context, dir string, action Action, opt Act
 	}
 
 	e := newEngine(c.rt, emit)
-	e.dryRun = dryRun
+	e.dryRun = dryRun || opt.DryRun
 	var runErr error
 	switch action {
 	case ActionUp:
@@ -283,19 +291,24 @@ func (c *Client) execute(ctx context.Context, dir string, action Action, opt Act
 }
 
 // PS 返回项目当前的容器列表（结构化数据，不再解析表格文本）。
-// all 为 false 时只列出运行中的容器。
-func (c *Client) PS(ctx context.Context, dir string, all bool) ([]PSEntry, error) {
-	p, err := loadProject(ctx, LoadOptions{Dir: dir})
+//
+// opt.All 为 false 时只列出运行中的容器；opt.Services 非空时只列出这些服务的容器。
+// opt 里的 Files / ProjectName / EnvFile 决定加载哪个项目，与其他动作一致。
+func (c *Client) PS(ctx context.Context, dir string, opt ActionOptions) ([]PSEntry, error) {
+	p, err := loadProject(ctx, optsFor(dir, opt))
 	if err != nil {
 		return nil, err
 	}
 	e := newEngine(c.rt, nil)
-	list, err := e.listProjectContainers(ctx, p.Name, all)
+	list, err := e.listProjectContainers(ctx, p.Name, opt.All)
 	if err != nil {
 		return nil, err
 	}
 	out := make([]PSEntry, 0, len(list))
 	for _, ct := range list {
+		if len(opt.Services) > 0 && !contains(opt.Services, ct.Service) {
+			continue
+		}
 		out = append(out, PSEntry{
 			ID: ct.ID, Name: ct.Name, Service: ct.Service, Image: ct.Image, Command: ct.Command,
 			Created: ct.Created, Status: ct.Status, Ports: ct.Ports, Running: ct.Running,
@@ -309,33 +322,95 @@ func (c *Client) Version(ctx context.Context) (string, error) {
 	return "wslc-compose " + Version + " (built-in)", nil
 }
 
-// Exec 在服务的容器里执行命令，返回合并输出。index 是副本序号（从 1 开始）。
-func (c *Client) Exec(ctx context.Context, dir, service string, index int, command []string) (string, error) {
-	if len(command) == 0 {
-		return "", errors.New("no command given")
-	}
-	p, err := loadProject(ctx, LoadOptions{Dir: dir})
+// WslcVersion 返回已安装的 wslc 的版本串（`wslc --version` 的输出）。
+func (c *Client) WslcVersion(ctx context.Context) (string, error) {
+	res, err := c.rt.Run(ctx, "--version")
 	if err != nil {
 		return "", err
 	}
+	if !res.Ok() {
+		return "", res.Error()
+	}
+	return strings.TrimSpace(res.Stdout), nil
+}
+
+// ExecOptions 控制 Exec。
+type ExecOptions struct {
+	// Index 是副本序号（从 1 开始），小于 1 按 1 处理。
+	Index int
+	// User 对应 -u。
+	User string
+	// WorkDir 对应 -w。
+	WorkDir string
+	// Env 是额外的环境变量（KEY=VALUE），对应 -e。
+	Env []string
+	// TTY 为 true 时分配伪终端（-t）。调用方负责判断标准输入是不是终端：
+	// 在管道里（如 `echo hi | wslc-compose exec web cat`）强行分配会失败。
+	TTY bool
+}
+
+// Exec 在服务的容器里执行命令。
+//
+// 子进程直接接到当前进程的标准输入输出，所以既可以交互（exec -it），也可以接管道；
+// 输出不会被捕获。返回的 Result.ExitCode 是容器内命令的退出码。
+//
+// opt.DryRun 为 true 时不执行，只在 Result.Args 里返回将要执行的 wslc 参数：
+// exec 在容器里做的事无法撤销，「预览」绝不能真的跑。
+func (c *Client) Exec(ctx context.Context, dir string, opt ActionOptions, service string, command []string, eo ExecOptions) (Result, error) {
+	if len(command) == 0 {
+		return Result{}, errors.New("no command given")
+	}
+	p, err := loadProject(ctx, optsFor(dir, opt))
+	if err != nil {
+		return Result{}, err
+	}
 	s, ok := p.Services[service]
 	if !ok {
-		return "", fmt.Errorf("no such service: %s", service)
+		return Result{}, fmt.Errorf("no such service: %s", service)
 	}
-	if index < 1 {
-		index = 1
+	args := execArgs(containerName(p, s, max(eo.Index, 1)), command, eo)
+	if opt.DryRun {
+		return Result{Args: args}, nil
 	}
-	res, err := c.rt.Run(ctx, append([]string{"exec", containerName(p, s, index)}, command...)...)
-	if err != nil {
-		return res.Combined(), err
+	return c.rt.Attach(ctx, args...)
+}
+
+// execArgs 生成 `wslc exec` 的参数。
+//
+// 总是带 -i：标准输入保持打开，管道输入才能送进容器（不要 TTY 只是不带 -t，不是关掉输入）。
+func execArgs(container string, command []string, eo ExecOptions) []string {
+	args := []string{"exec", "-i"}
+	if eo.TTY {
+		args = append(args, "-t")
 	}
-	return res.Combined(), res.Error()
+	if eo.User != "" {
+		args = append(args, "-u", eo.User)
+	}
+	if eo.WorkDir != "" {
+		args = append(args, "-w", eo.WorkDir)
+	}
+	for _, e := range eo.Env {
+		args = append(args, "-e", e)
+	}
+	args = append(args, container)
+	return append(args, command...)
+}
+
+// LogsOptions 控制 Logs。
+type LogsOptions struct {
+	// Follow 为 true 时持续输出，直到 ctx 被取消。
+	Follow bool
+	// Tail 只取每个容器日志的最后 N 行，0 表示全部。
+	Tail int
+	// Timestamps 在每行前加时间戳。
+	Timestamps bool
 }
 
 // Logs 读取项目内各服务的日志，每行加上容器名前缀；包括已停止或崩溃的容器，那正是日志最有用的时候。
-// follow 为 true 时持续输出直到 ctx 被取消。
-func (c *Client) Logs(ctx context.Context, dir string, services []string, follow bool, tail int, timestamps bool, onLine func(string)) error {
-	p, err := loadProject(ctx, LoadOptions{Dir: dir})
+// opt.Services 非空时只看这些服务。onLine 会在多个 goroutine 里被并发调用（每个容器一个），
+// 调用方要保证一次写一整行。
+func (c *Client) Logs(ctx context.Context, dir string, opt ActionOptions, lo LogsOptions, onLine func(string)) error {
+	p, err := loadProject(ctx, optsFor(dir, opt))
 	if err != nil {
 		return err
 	}
@@ -346,7 +421,7 @@ func (c *Client) Logs(ctx context.Context, dir string, services []string, follow
 	}
 	var picked []container
 	for _, ct := range list {
-		if len(services) == 0 || contains(services, ct.Service) {
+		if len(opt.Services) == 0 || contains(opt.Services, ct.Service) {
 			picked = append(picked, ct)
 		}
 	}
@@ -365,13 +440,13 @@ func (c *Client) Logs(ctx context.Context, dir string, services []string, follow
 	var firstErr error
 	for _, ct := range picked {
 		args := []string{"logs"}
-		if follow && ct.Running {
+		if lo.Follow && ct.Running {
 			args = append(args, "-f")
 		}
-		if tail > 0 {
-			args = append(args, "-n", strconv.Itoa(tail))
+		if lo.Tail > 0 {
+			args = append(args, "-n", strconv.Itoa(lo.Tail))
 		}
-		if timestamps {
+		if lo.Timestamps {
 			args = append(args, "-t")
 		}
 		args = append(args, ct.Name)

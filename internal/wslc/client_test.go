@@ -170,3 +170,69 @@ func TestFollowStartFailureDoesNotCorruptLock(t *testing.T) {
 		t.Fatal("找不到可执行文件应返回错误")
 	}
 }
+
+// Attach 把子进程的退出码原样带回来：命令行的 exec 靠它把容器内命令的成败传给脚本。
+func TestAttachReturnsExitCode(t *testing.T) {
+	c := cmdClient(t)
+	res, err := c.Attach(context.Background(), "/c", "exit", "3")
+	if err != nil || res.ExitCode != 3 {
+		t.Fatalf("res=%+v err=%v，期望退出码 3 且无 error", res, err)
+	}
+	if res, err = c.Attach(context.Background(), "/c", "exit", "0"); err != nil || !res.Ok() {
+		t.Fatalf("退出码 0 应算成功: res=%+v err=%v", res, err)
+	}
+}
+
+// 被取消（用户按了 Ctrl+C）时，进程是被我们杀掉的，退出码没有意义，
+// 要如实报告「被取消」，而不是伪装成一次普通的失败退出。
+func TestAttachReportsCancellation(t *testing.T) {
+	c := pingClient(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		cancel()
+	}()
+	start := time.Now()
+	res, err := c.Attach(ctx, "-n", "20", "127.0.0.1")
+	if err == nil || res.ExitCode != -1 {
+		t.Fatalf("res=%+v err=%v，期望 error 且退出码 -1", res, err)
+	}
+	if elapsed := time.Since(start); elapsed > 5*time.Second {
+		t.Errorf("取消后没有及时结束，耗时 %s", elapsed)
+	}
+}
+
+// Attach 不占串行锁：一个挂着的交互会话不能把其他命令堵死。
+func TestAttachDoesNotBlockOtherCommands(t *testing.T) {
+	c := pingClient(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	attached := make(chan struct{})
+	go func() {
+		defer close(attached)
+		_, _ = c.Attach(ctx, "-n", "9", "127.0.0.1")
+	}()
+	time.Sleep(300 * time.Millisecond) // 让 Attach 先跑起来
+
+	done := make(chan struct{})
+	go func() {
+		_, _ = c.Run(context.Background(), "-n", "1", "127.0.0.1")
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatal("Attach 占用了串行锁，把 Run 堵住了")
+	}
+	cancel()
+	<-attached
+}
+
+func TestAttachStartFailure(t *testing.T) {
+	c := NewWithBinary(`C:\definitely\not\here.exe`)
+	res, err := c.Attach(context.Background(), "x")
+	if err == nil || res.ExitCode != -1 {
+		t.Fatalf("找不到可执行文件应返回 error 且退出码 -1: res=%+v err=%v", res, err)
+	}
+}

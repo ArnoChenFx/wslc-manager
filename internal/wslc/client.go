@@ -325,6 +325,49 @@ func (c *Client) Follow(ctx context.Context, onLine func(line string), args ...s
 	return c.stream(ctx, onLine, args, false)
 }
 
+// Attach 执行命令，并把子进程的 stdin / stdout / stderr 直接接到当前进程的标准流。
+//
+// 用于 `exec -i -t` 这类需要终端的交互命令：输出不经过我们，直接写到用户的终端，
+// 所以 Result 里没有 Stdout / Stderr，只有退出码。
+//
+// 和 Follow 一样不占串行锁、也不套默认超时：交互会话可能开几个小时，
+// 而且它占着终端，同一时刻本来就只会有这一个。
+//
+// 故意不调用 hideWindow：CREATE_NO_WINDOW 会让子进程没有控制台，
+// 需要终端的程序（wslc exec -t）就拿不到可用的控制台句柄。命令行程序从终端里启动子进程
+// 本来就不会弹窗，所以只有命令行程序会用这个方法；图形界面不要调用它。
+func (c *Client) Attach(ctx context.Context, args ...string) (Result, error) {
+	start := time.Now()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	cmd := exec.CommandContext(ctx, c.bin, args...)
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+
+	err := cmd.Run()
+	res := Result{Args: args, Duration: time.Since(start)}
+	if err != nil {
+		// 被取消（用户按了 Ctrl+C）时进程是被我们杀掉的，退出码没有意义，
+		// 要如实报告「被取消」，而不是伪装成一次普通的失败。
+		if ctx.Err() != nil {
+			res.ExitCode = -1
+			c.callHook(res)
+			return res, ctx.Err()
+		}
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			res.ExitCode = ee.ExitCode()
+			c.callHook(res)
+			return res, nil
+		}
+		res.ExitCode = -1
+		c.callHook(res)
+		return res, fmt.Errorf("执行 %s 失败: %w", strings.Join(args, " "), err)
+	}
+	c.callHook(res)
+	return res, nil
+}
+
 // stream 是 RunStream 与 Follow 的共同实现。
 //
 // locked 为 true 表示调用方已经持有串行锁，本函数负责在命令结束后释放；

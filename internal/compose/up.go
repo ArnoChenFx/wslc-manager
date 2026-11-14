@@ -64,6 +64,12 @@ func (e *engine) up(ctx context.Context, p *types.Project, o upOptions) error {
 	if len(services) == 0 {
 		return errors.New("no services to start")
 	}
+	// 给不存在的服务指定副本数十有八九是拼写错了：悬悬忽略会让用户以为扩容生效了。
+	for _, name := range sortedKeys(o.Scale) {
+		if _, ok := p.Services[name]; !ok {
+			return fmt.Errorf("--scale: no such service: %s", name)
+		}
+	}
 	for _, w := range e.runtimeWarnings(ctx, services) {
 		e.info("warning: %s", w)
 	}

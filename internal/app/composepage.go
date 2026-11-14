@@ -840,7 +840,7 @@ func (a *App) composePS(p compose.Project) {
 	go func() {
 		ctx, cancel := longContext()
 		defer cancel()
-		entries, err := a.compose.PS(ctx, p.Dir, true)
+		entries, err := a.compose.PS(ctx, p.Dir, compose.ActionOptions{All: true})
 
 		a.update(func() {
 			if err != nil {

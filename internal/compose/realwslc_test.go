@@ -3,6 +3,7 @@
 package compose
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -25,13 +26,30 @@ import (
 
 // realClient 用真实 wslc 构造 Runtime。这里不能 import internal/wslc（compose 不依赖它），
 // 所以直接用 exec 实现一个最小的 Runtime。
-type realRuntime struct{ bin string }
+type realRuntime struct {
+	bin string
+	// attachOut 接住 Attach（交互命令）的输出。真实使用时输出直接写到终端，测试里要断言它。
+	attachOut *bytes.Buffer
+}
 
 func (r realRuntime) Run(ctx context.Context, args ...string) (Result, error) {
+	return r.runCmd(ctx, nil, args)
+}
+
+// Attach 实现 Runtime：把输出写进 attachOut，而不是终端。
+func (r realRuntime) Attach(ctx context.Context, args ...string) (Result, error) {
+	return r.runCmd(ctx, r.attachOut, args)
+}
+
+// runCmd 运行 wslc。attach 非 nil 时 stdout 写到它里面，Result.Stdout 留空（与真正的 Attach 一致）。
+func (r realRuntime) runCmd(ctx context.Context, attach *bytes.Buffer, args []string) (Result, error) {
 	start := time.Now()
 	cmd := exec.CommandContext(ctx, r.bin, args...)
 	var out, errb strings.Builder
 	cmd.Stdout, cmd.Stderr = &out, &errb
+	if attach != nil {
+		cmd.Stdout = attach
+	}
 	err := cmd.Run()
 	res := Result{Args: args, Stdout: out.String(), Stderr: errb.String(), Duration: time.Since(start)}
 	if err != nil {
@@ -77,7 +95,7 @@ func requireRealWslc(t *testing.T) (realRuntime, *Client) {
 			t.Skip("没有安装 wslc")
 		}
 	}
-	rt := realRuntime{bin: bin}
+	rt := realRuntime{bin: bin, attachOut: &bytes.Buffer{}}
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	res, err := rt.Run(ctx, "images", "--format", "json")
@@ -220,7 +238,7 @@ volumes:
 	}
 	t.Logf("第一次 up 输出:\n%s", strings.Join(lines, "\n"))
 
-	entries, err := c.PS(ctx, dir, true)
+	entries, err := c.PS(ctx, dir, ActionOptions{All: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,20 +284,26 @@ volumes:
 	if res, _ := c.RunActionStream(ctx, dir, ActionStop, ActionOptions{Timeout: 2}, nil); !res.Ok() {
 		t.Fatalf("stop 失败: %v", res.Error())
 	}
-	if running, _ := c.PS(ctx, dir, false); len(running) != 0 {
+	if running, _ := c.PS(ctx, dir, ActionOptions{}); len(running) != 0 {
 		t.Errorf("stop 之后不应有运行中的容器: %+v", running)
 	}
 	if res, _ := c.RunActionStream(ctx, dir, ActionStart, ActionOptions{}, nil); !res.Ok() {
 		t.Fatalf("start 失败: %v", res.Error())
 	}
-	if running, _ := c.PS(ctx, dir, false); len(running) != 2 {
+	if running, _ := c.PS(ctx, dir, ActionOptions{}); len(running) != 2 {
 		t.Errorf("start 之后应有 2 个运行中的容器: %+v", running)
 	}
 
 	// ---- exec 与 logs ----
-	out, err := c.Exec(ctx, dir, "app", 1, []string{"sh", "-c", "echo $GREETING"})
-	if err != nil || !strings.Contains(out, "changed") {
-		t.Errorf("exec 输出 = %q, err=%v（环境变量应是改过之后的值）", out, err)
+	rt.attachOut.Reset()
+	res, err = c.Exec(ctx, dir, ActionOptions{}, "app", []string{"sh", "-c", "echo $GREETING"}, ExecOptions{})
+	if err != nil || !res.Ok() || !strings.Contains(rt.attachOut.String(), "changed") {
+		t.Errorf("exec 输出 = %q, res=%+v, err=%v（环境变量应是改过之后的值）", rt.attachOut.String(), res, err)
+	}
+	// exec 要把容器内命令的退出码带回来，脚本才能据此判断成败。
+	res, err = c.Exec(ctx, dir, ActionOptions{}, "app", []string{"sh", "-c", "exit 7"}, ExecOptions{})
+	if err != nil || res.ExitCode != 7 {
+		t.Errorf("exec exit 7 的结果 = %+v, err=%v，期望退出码 7", res, err)
 	}
 
 	// ---- down ----

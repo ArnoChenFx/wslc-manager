@@ -19,6 +19,7 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"github.com/arno/wslc-manager/internal/compose"
+	"github.com/arno/wslc-manager/internal/composert"
 	"github.com/arno/wslc-manager/internal/envsetup"
 	"github.com/arno/wslc-manager/internal/selfupdate"
 	"github.com/arno/wslc-manager/internal/store"
@@ -342,7 +343,7 @@ func (a *App) Init() {
 		a.logError("compose", "Compose 引擎不可用：wslc 不可用")
 		return
 	}
-	c := compose.New(composeRuntime{c: a.wslc})
+	c := compose.New(composert.New(a.wslc))
 	a.compose = c
 	a.composeStream = c.RunActionStream
 	a.logInfo("compose", "内置引擎 %s", compose.Version)

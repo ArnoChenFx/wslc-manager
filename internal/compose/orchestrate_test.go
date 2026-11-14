@@ -842,7 +842,7 @@ func TestPS(t *testing.T) {
 	runAction(t, c, dir, ActionUp, ActionOptions{Detach: true})
 	f.markExited("demo-web-1", 0)
 
-	all, err := c.PS(context.Background(), dir, true)
+	all, err := c.PS(context.Background(), dir, ActionOptions{All: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -853,7 +853,7 @@ func TestPS(t *testing.T) {
 	if want := []string{"db:demo-db-1", "web:demo-web-1"}; !reflect.DeepEqual(names, want) {
 		t.Errorf("ps -a = %v, 期望 %v", names, want)
 	}
-	running, _ := c.PS(context.Background(), dir, false)
+	running, _ := c.PS(context.Background(), dir, ActionOptions{})
 	if len(running) != 1 || running[0].Service != "db" || !running[0].Running {
 		t.Errorf("ps 只应列出运行中的: %+v", running)
 	}
@@ -891,7 +891,7 @@ func TestLoadProjectWarningsReachTheView(t *testing.T) {
 
 func TestConfigYAML(t *testing.T) {
 	c, _, dir := newTestClient(t, twoServices)
-	out, err := c.ConfigYAML(context.Background(), dir, ActionOptions{})
+	out, _, err := c.ConfigYAML(context.Background(), dir, ActionOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -902,22 +902,12 @@ func TestConfigYAML(t *testing.T) {
 	}
 }
 
-func TestExecAndLogs(t *testing.T) {
+func TestLogs(t *testing.T) {
 	c, f, dir := newTestClient(t, twoServices)
 	runAction(t, c, dir, ActionUp, ActionOptions{Detach: true})
 
-	if _, err := c.Exec(context.Background(), dir, "web", 1, []string{"ls", "/"}); err != nil {
-		t.Fatal(err)
-	}
-	if f.find("exec demo-web-1 ls /") < 0 {
-		t.Errorf("exec 命令不对:\n%s", strings.Join(f.commands(), "\n"))
-	}
-	if _, err := c.Exec(context.Background(), dir, "ghost", 1, []string{"ls"}); err == nil {
-		t.Error("未知服务应报错")
-	}
-
 	var lines []string
-	if err := c.Logs(context.Background(), dir, []string{"web"}, false, 50, true, func(l string) { lines = append(lines, l) }); err != nil {
+	if err := c.Logs(context.Background(), dir, ActionOptions{Services: []string{"web"}}, LogsOptions{Tail: 50, Timestamps: true}, func(l string) { lines = append(lines, l) }); err != nil {
 		t.Fatal(err)
 	}
 	if len(lines) != 1 || !strings.HasPrefix(lines[0], "demo-web-1 | ") {

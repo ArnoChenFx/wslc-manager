@@ -34,7 +34,9 @@ type fakeWslc struct {
 	onCommand func(f *fakeWslc, args []string)
 	// runHelp 是 `run --help` 的输出；决定哪些可选选项被认为受支持。
 	runHelp string
-	nextID  int
+	// attachExit 是 Attach（交互命令）返回的退出码。
+	attachExit int
+	nextID     int
 }
 
 type fakeContainer struct {
@@ -139,6 +141,17 @@ func (f *fakeWslc) Follow(ctx context.Context, onLine func(string), args ...stri
 	return f.RunStream(ctx, onLine, args...)
 }
 
+// Attach 实现 Runtime：交互命令不捕获输出，这里只记录命令并返回预设的退出码。
+func (f *fakeWslc) Attach(ctx context.Context, args ...string) (Result, error) {
+	if err := ctx.Err(); err != nil {
+		return Result{}, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.cmds = append(f.cmds, strings.Join(args, " "))
+	return Result{Args: args, ExitCode: f.attachExit}, nil
+}
+
 // dispatch 在持锁状态下执行一条命令，返回 (stdout, 错误文本)。
 func (f *fakeWslc) dispatch(args []string) (string, string) {
 	if len(args) == 0 {
@@ -214,6 +227,8 @@ func (f *fakeWslc) dispatch(args []string) (string, string) {
 		return f.networkCmd(args[1:])
 	case "volume":
 		return f.volumeCmd(args[1:])
+	case "--version":
+		return "wslc fake-1.2.3\n", ""
 	case "exec":
 		return "", ""
 	case "logs":

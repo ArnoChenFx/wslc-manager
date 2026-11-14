@@ -68,6 +68,11 @@ type Runtime interface {
 	// Follow 同 RunStream，但**不占用串行锁**，专给 `logs -f` 这类长期存活的只读流。
 	// 如果它也排队，一条没结束的 logs -f 就会把后续所有命令堵死。
 	Follow(ctx context.Context, onLine func(string), args ...string) (Result, error)
+	// Attach 同 Run，但子进程的 stdin / stdout / stderr 直接接到当前进程的标准流，
+	// 用于 `exec -it` 这类需要终端的交互命令。输出不会被捕获，Result 里只有退出码。
+	// 和 Follow 一样不占串行锁：一个交互会话可能开几个小时，而且它占着终端。
+	// 只有命令行程序会用它；图形界面没有可以接的终端。
+	Attach(ctx context.Context, args ...string) (Result, error)
 }
 
 // WslcError 表示一条 wslc 命令执行失败。
