@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!--
+    WSLC Manager 产品图标
+
+    设计意图：
+    - 圆角方形底，深海蓝渐变，与界面主题同源；
+    - 中间三层「紧贴」堆叠的圆角矩形 = 容器层（layer），
+      层与层之间只留一道细缝，一眼就能读成「一叠」而不是三根独立横条；
+    - 顶层内放终端提示符 >_，点明这是命令行工具的图形外壳；
+    - 顶层右下角一个青绿圆点，暗示「运行中」状态，
+      也是小尺寸下唯一还认得出的细节。
+
+    坐标按 1024 画布设计，缩放到任意尺寸都不会糊。
+  -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b2a3d"/>
+      <stop offset="1" stop-color="#0d141c"/>
+    </linearGradient>
+
+    <!-- 层：越靠上越亮，形成堆叠的体积感 -->
+    <linearGradient id="layer1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#58b6ff"/>
+      <stop offset="1" stop-color="#2f8ae0"/>
+    </linearGradient>
+    <linearGradient id="layer2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2d7cbe"/>
+      <stop offset="1" stop-color="#1d5c92"/>
+    </linearGradient>
+    <linearGradient id="layer3" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f557b"/>
+      <stop offset="1" stop-color="#143e5b"/>
+    </linearGradient>
+
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.32"/>
+    </filter>
+  </defs>
+
+  <!-- 圆角方形底 -->
+  <rect x="72" y="72" width="880" height="880" rx="196" fill="url(#bg)"/>
+  <rect x="72" y="72" width="880" height="880" rx="196" fill="none"
+        stroke="#ffffff" stroke-opacity="0.10" stroke-width="4"/>
+  <rect x="72" y="72" width="880" height="440" rx="196" fill="url(#gloss)"/>
+
+  <!--
+    三层紧贴堆叠：每层 150 高，层间隙 16，
+    三层的总高度 482，垂直居中于画布。
+    从下往上画，让上层的投影落在下层上。
+  -->
+  <g filter="url(#soft)">
+    <rect x="240" y="566" width="544" height="158" rx="42" fill="url(#layer3)"/>
+    <rect x="240" y="396" width="544" height="158" rx="42" fill="url(#layer2)"/>
+    <rect x="240" y="226" width="544" height="158" rx="42" fill="url(#layer1)"/>
+  </g>
+
+  <!-- 层与层之间的细缝：读成「分开的层」而不是三条独立横条 -->
+  <rect x="262" y="546" width="500" height="10" rx="5" fill="#0b1420" fill-opacity="0.6"/>
+  <rect x="262" y="376" width="500" height="10" rx="5" fill="#0b1420" fill-opacity="0.6"/>
+
+  <!-- 顶层里的终端提示符 >_ -->
+  <g fill="none" stroke="#0b1017" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M322 278 L392 306 L322 334"/>
+    <path d="M416 334 L496 334"/>
+  </g>
+
+  <!-- 中层的两道装饰线，暗示「一行行条目」 -->
+  <rect x="322" y="450" width="380" height="15" rx="7" fill="#0b1420" fill-opacity="0.38"/>
+  <rect x="322" y="482" width="248" height="15" rx="7" fill="#0b1420" fill-opacity="0.26"/>
+
+  <!-- 底层两道装饰线 -->
+  <rect x="322" y="620" width="380" height="15" rx="7" fill="#0b1420" fill-opacity="0.34"/>
+  <rect x="322" y="652" width="210" height="15" rx="7" fill="#0b1420" fill-opacity="0.22"/>
+
+  <!-- 顶层右下角的「运行中」状态点 -->
+  <circle cx="748" cy="352" r="32" fill="#3ecf8e"/>
+  <circle cx="748" cy="352" r="32" fill="none" stroke="#0b1420" stroke-opacity="0.4" stroke-width="6"/>
+</svg>

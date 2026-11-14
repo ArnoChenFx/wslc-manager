@@ -1,0 +1,1091 @@
+{
+  "@@locale": "zh-Hans",
+  "appName": "WSLC Manager",
+  "appTagline": "在 Windows 上管理 WSL 容器",
+  "navResources": "资源",
+  "navOrchestration": "编排与系统",
+  "navContainers": "容器",
+  "navImages": "镜像",
+  "navVolumes": "卷",
+  "navNetworks": "网络",
+  "navCompose": "Compose 项目",
+  "navSystem": "系统信息",
+  "commonRefresh": "刷新",
+  "commonRefreshTooltip": "重新读取 wslc 数据 (F5)",
+  "commonSettings": "设置",
+  "commonSave": "保存",
+  "commonCancel": "取消",
+  "commonConfirm": "确定",
+  "commonClose": "关闭",
+  "commonDelete": "删除",
+  "commonRemove": "移除",
+  "commonAdd": "添加",
+  "commonCreate": "创建",
+  "commonCopy": "复制",
+  "commonUpdate": "更新",
+  "commonStart": "启动",
+  "commonStop": "停止",
+  "commonRestart": "重启",
+  "commonTerminate": "终止",
+  "commonBuild": "构建",
+  "commonPull": "拉取",
+  "commonPrune": "清理",
+  "commonCheck": "检查",
+  "commonClear": "清空",
+  "commonJoin": "加入",
+  "commonCustom": "自定义",
+  "commonBuiltin": "内置",
+  "commonSummary": "摘要",
+  "commonStats": "统计",
+  "commonLogs": "日志",
+  "commonMore": "更多",
+  "commonMoreActions": "更多操作",
+  "commonName": "名称",
+  "commonType": "类型",
+  "commonStatus": "状态",
+  "commonSize": "大小",
+  "commonPort": "端口",
+  "commonDriver": "驱动",
+  "commonArchitecture": "架构",
+  "commonTags": "标签",
+  "commonRepository": "仓库",
+  "commonReplicas": "副本数",
+  "commonDependsOn": "依赖",
+  "commonEnvironment": "环境",
+  "commonSessions": "会话",
+  "commonMaintenance": "维护",
+  "commonResources": "资源",
+  "commonDetails": "详情",
+  "commonFile": "文件",
+  "commonNever": "尚未",
+  "commonNone": "（无）",
+  "commonLoading": "正在读取",
+  "commonFilter": "过滤…",
+  "commonCopied": "已复制",
+  "commonCopyToClipboard": "复制到剪贴板",
+  "commonCopyAll": "复制全部内容",
+  "commonOpenInExplorer": "在资源管理器中打开",
+  "commonCommandPreview": "命令预览",
+  "commonNoOutput": "（命令没有输出）",
+  "commonUnknown": "未知",
+  "commonRequired": "必填",
+  "commonEnabled": "启用",
+  "commonDisabled": "停用",
+  "statusLoading": "正在读取…",
+  "statusNotRefreshed": "尚未刷新",
+  "statusUpdatedAt": "更新于 {time}",
+  "statusRunning": "正在执行 {what}",
+  "statusComposeRunning": "正在执行 wslc-compose {action}",
+  "actionStarted": "开始 {name}",
+  "actionFinished": "完成 {name}",
+  "actionFailed": "{name} 失败: {error}",
+  "actionDone": "完成。",
+  "actionDoneWithDuration": "完成（耗时 {duration}）",
+  "actionFailedPrefix": "失败：",
+  "actionCopyFromMenu": "想复制这一行的话，用右键菜单里的「复制」。",
+  "errorWslcUnavailable": "无法使用 wslc",
+  "errorComposeUnavailable": "无法使用 wslc-compose",
+  "errorRecheck": "重新检测",
+  "errorRechecked": "环境已重新检测",
+  "errorOperationFailed": "操作失败: {error}",
+  "containersName": "容器名",
+  "containersState": "容器状态",
+  "containersImage": "镜像 / 构建",
+  "containersCreated": "创建于",
+  "containersEmptyTitle": "没有容器",
+  "containersEmptyBody": "从 Compose 项目启动一组服务，或拉取镜像后手动运行",
+  "containersHideStopped": "隐藏已停止",
+  "containersStart": "启动选中的容器",
+  "containersStop": "停止选中的容器",
+  "containersRestart": "重启选中的容器",
+  "containersForceDelete": "强制删除选中的容器",
+  "containersDelete": "删除容器",
+  "containersShowStats": "查看容器状态",
+  "containersShowLogs": "查看容器日志",
+  "containersShowInspect": "查看容器 inspect 详情",
+  "containersCopyID": "复制容器 ID",
+  "containersConfirmDelete": "确定要删除容器 {name} 吗？运行中的容器会被强制停止。",
+  "containersPrune": "清理已停止的容器",
+  "containersPruneConfirm": "将删除所有已停止的容器。继续？",
+  "containersPruned": "已清理停止的容器",
+  "containersLogsEmpty": "（该容器没有日志输出）",
+  "imagesTitle": "镜像列表",
+  "imagesId": "镜像 ID",
+  "imagesUsedBy": "引用容器数",
+  "imagesUniqueSize": "独占大小",
+  "imagesSharedSize": "共享大小",
+  "imagesCreated": "创建时间",
+  "imagesEmptyTitle": "没有镜像",
+  "imagesEmptyBody": "点「拉取镜像…」从仓库下载一个",
+  "imagesPull": "拉取镜像",
+  "imagesPullTitle": "拉取镜像",
+  "imagesPullPlaceholder": "输入镜像引用，例如 nginx:alpine",
+  "imagesPulling": "拉取镜像…",
+  "imagesUpdate": "更新镜像",
+  "imagesUpdateThis": "更新该镜像",
+  "imagesUpdateAll": "一键更新全部",
+  "imagesShowTags": "查看标签",
+  "imagesShowDetails": "查看详情",
+  "imagesShowStats": "查看资源占用",
+  "imagesShowConfig": "查看配置",
+  "imagesListTagsTooltip": "列出同仓库的所有标签",
+  "imagesUpdateTooltip": "重新拉取选中镜像，拉到同一仓库的最新版本",
+  "imagesUpdateAllTooltip": "重新拉取列表中所有有仓库名的镜像",
+  "imagesDelete": "删除选中镜像",
+  "imagesPrune": "清理悬空镜像",
+  "imagesPruneConfirm": "将删除未被任何容器使用的悬空镜像。继续？",
+  "imagesPruned": "已清理悬空镜像",
+  "imagesDanglingNoTags": "悬空镜像没有仓库名，无法列出标签",
+  "imagesLocalTags": "本地共有 {count, plural, =0 {0 个标签} other {# 个标签}}",
+  "imagesNoLocalRepo": "\n本地没有该仓库的镜像。\n",
+  "imagesUpdateHint": "\n提示：想获取仓库里的新版本，用「更新」或右键「更新该镜像」。\n",
+  "imagesUpdateQueue": "将依次重新拉取以下 {count} 个镜像：",
+  "imagesPullSequential": "\n\n拉取会逐个执行，进度实时显示在下方面板。",
+  "imagesUpdateOverwrite": "，用仓库里的最新内容覆盖本地同标签镜像。继续？",
+  "imagesUpdating": "准备更新 {count} 个镜像…",
+  "imagesUpdated": "已更新 {count} 个镜像",
+  "imagesUpdateSummary": "更新完成：成功 {ok}，失败 {failed}",
+  "imagesNothingToUpdate": "没有可更新的镜像（都是悬空镜像）",
+  "imagesPullRunning": "后台运行",
+  "volumesTitle": "卷列表",
+  "volumesName": "卷名称",
+  "volumesNew": "新建卷",
+  "volumesNewTitle": "新建卷",
+  "volumesEmptyTitle": "没有命名卷",
+  "volumesEmptyBody": "点「新建卷…」创建一个，或启动一个 Compose 项目",
+  "volumesDelete": "删除卷",
+  "volumesDeleteSelected": "删除选中的卷（数据会丢失）",
+  "volumesCopyMount": "复制挂载点",
+  "volumesMountPoint": "挂载点",
+  "networksTitle": "网络列表",
+  "networksName": "网络名称",
+  "networksId": "网络 ID",
+  "networksNew": "新建网络",
+  "networksNewTitle": "新建网络",
+  "networksNewTooltip": "创建一个 bridge 驱动网络",
+  "networksEmptyTitle": "没有网络",
+  "networksEmptyBody": "点「新建网络…」创建一个",
+  "networksDelete": "删除网络",
+  "networksDeleteSelected": "删除选中的网络（内置网络不可删除）",
+  "networksCopyID": "复制网络 ID",
+  "composeProjects": "项目",
+  "composeList": "Compose 项目列表",
+  "composeAdd": "添加项目",
+  "composeAddTitle": "添加 Compose 项目",
+  "composeAddTooltip": "添加一个已有的 compose 项目目录",
+  "composeScan": "扫描",
+  "composeScanTooltip": "在设置的扫描目录里搜索 compose 项目",
+  "composeScanDone": "扫描完成，新增/保留 {count} 个项目",
+  "composeEmptyTitle": "还没有 compose 项目",
+  "composeEmptyBody": "点「添加项目」选择一个包含 compose.yaml 的目录，或点「扫描」在设置里的扫描目录中查找。",
+  "composeSelectHint": "选择一个项目",
+  "composeSelectHintBody": "左侧列出来自 wslc-compose 的 compose 项目",
+  "composeChooseDir": "选择包含 compose.yaml / docker-compose.yml 的项目目录。",
+  "composeNoComposeFile": "该目录下没有 compose.yaml / docker-compose.yml",
+  "composeWillValidate": "将添加到项目列表，路径会由 wslc-compose 做校验。",
+  "composeRemoveFromList": "从列表移除",
+  "composeReload": "重新载入配置",
+  "composeCopyDir": "复制目录路径",
+  "composeNoServices": "该项目没有定义服务",
+  "composeNoContainers": "该项目当前没有容器。",
+  "composeStartFirst": "先构建镜像",
+  "composeServices": "服务",
+  "composeService": "服务 {name}",
+  "composeStartService": "启动该服务",
+  "composeStopService": "停止该服务",
+  "composeRestartService": "重启该服务",
+  "composeUp": "启动",
+  "composeDown": "移除",
+  "composeStart": "启动",
+  "composeStop": "停止",
+  "composeRestart": "重启",
+  "composeRemoveContainers": "移除项目容器",
+  "composeRemoveVolumes": "移除时删卷",
+  "composeRemoveVolumesTooltip": "等价于 down -v，会丢数据",
+  "composeBuild": "构建",
+  "composeBuildTooltip": "等价于 up --build",
+  "composeUpTooltip": "等价于 up -d",
+  "composePreviewUp": "预览 up 命令",
+  "composeStartOptions": "启动选项",
+  "composeRunning": "运行中",
+  "composeServiceRunning": "运行中",
+  "composeExecuting": "执行中",
+  "composeExecutingEllipsis": "执行中…",
+  "composeExecutingHint": "执行中，请稍候",
+  "composeLogsEmpty": "（该服务没有日志输出）",
+  "composeClosePanel": "关闭面板",
+  "systemVersion": "程序版本",
+  "systemWslcPath": "wslc 路径",
+  "systemComposePath": "wslc-compose 路径",
+  "systemWslcSettings": "wslc 设置",
+  "systemWslVersion": "WSL 版本",
+  "systemKernelVersion": "内核版本",
+  "systemWindowsVersion": "Windows 版本",
+  "systemSessionManager": "会话管理器",
+  "systemSessions": "会话",
+  "systemCreatorPID": "创建者 PID",
+  "systemDisplayName": "显示名称",
+  "systemKnownLimits": "已知限制（wslc 预览版）",
+  "systemLimitSerial": "wslc 同一时刻只容忍一个调用，本应用已自动串行化。",
+  "systemLimitRestartPolicy": "当前版本不支持 pause/unpause、unless-stopped / on-failure 重启策略。",
+  "systemLimitVolumes": "每个 WSL 会话最多挂载约 15 个卷，超出会报 Too many volumes have been mounted；用 wsl --shutdown 重置。",
+  "systemLimitLoopback": "发布端口绑定在 Windows 回环地址上，需在 Windows 侧测试（浏览器/Invoke-WebRequest）。",
+  "systemElevation": "不同提权级别（普通 / 管理员）的终端拥有彼此独立的 wslc 会话，容器、镜像、网络、卷互不可见。",
+  "settingsTitle": "设置",
+  "settingsGeneral": "常规",
+  "settingsLanguage": "界面语言",
+  "settingsLanguageHint": "切换后立即生效，并会记住你的选择。",
+  "settingsAutoRefresh": "自动刷新间隔（秒）",
+  "settingsAutoRefreshHint": "界面每隔多少秒静默刷新一次数据",
+  "settingsScanDirs": "扫描根目录",
+  "settingsScanDepth": "递归深度",
+  "settingsScanDepthHint": "在扫描根目录下最多向下查找几层",
+  "settingsAddDir": "添加目录",
+  "settingsRemoveDir": "移除该扫描目录",
+  "settingsSettingsFile": "设置文件",
+  "settingsOpenFolder": "打开设置文件所在目录",
+  "settingsSaved": "设置已保存",
+  "settingsRestartRequired": "重启应用后生效",
+  "logsTitle": "运行日志",
+  "logsHint": "每次 wslc / wslc-compose 调用、页面切换、操作结果都会记录。",
+  "logsClear": "清空当前日志",
+  "logsCopy": "复制全部日志",
+  "logsCopied": "日志已复制到剪贴板",
+  "logsEmpty": "（暂无日志）",
+  "diagTitle": "诊断报告",
+  "diagExport": "导出诊断报告",
+  "diagCopy": "复制到剪贴板",
+  "diagCopyTooltip": "把报告全文复制到剪贴板",
+  "diagHint": "遇到布局错位、点击无反应等问题时，导出一份报告发给我，里面有环境版本、当前界面元素坐标、最近命令与错误日志。",
+  "diagGenerating": "正在生成诊断报告…",
+  "diagSaved": "诊断报告已保存到 {path}",
+  "diagCopied": "报告已复制到剪贴板（{bytes} 字节）",
+  "diagLastExport": "上次导出: {path}",
+  "diagFailed": "生成诊断报告失败: {error}",
+  "menuCopy": "复制",
+  "menuPaste": "粘贴",
+  "menuCut": "剪切",
+  "menuSelectAll": "全选",
+  "menuQuit": "退出",
+  "menuAbout": "关于",
+  "aboutTitle": "关于 WSLC Manager",
+  "aboutVersion": "版本 {version}",
+  "emptySelectRow": "选择一行查看详情",
+  "emptyNoMatch": "没有匹配的条目",
+  "emptyLoadFailed": "读取失败：{error}",
+  "@appName": {
+    "description": "The product name, shown in window titles and the About box. Never translated."
+  },
+  "@appTagline": {
+    "description": "One-line description under the product name."
+  },
+  "@navResources": {
+    "description": "Sidebar section header grouping containers, images, volumes and networks."
+  },
+  "@navOrchestration": {
+    "description": "Sidebar section header grouping Compose projects and the system page."
+  },
+  "@commonRefresh": {
+    "description": "Toolbar button that reloads all data from wslc."
+  },
+  "@statusUpdatedAt": {
+    "description": "Status bar: when the data was last read successfully.",
+    "placeholders": {
+      "time": {
+        "type": "String",
+        "example": "14:32:05"
+      }
+    }
+  },
+  "@statusRunning": {
+    "placeholders": {
+      "what": {
+        "type": "String"
+      }
+    }
+  },
+  "@statusComposeRunning": {
+    "placeholders": {
+      "action": {
+        "type": "String",
+        "example": "启动"
+      }
+    }
+  },
+  "@actionStarted": {
+    "description": "Log line when a long operation begins.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "启动 · demo"
+      }
+    }
+  },
+  "@actionFinished": {
+    "description": "Log line when a long operation succeeds.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@actionFailed": {
+    "description": "Log line when a long operation fails.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@actionDoneWithDuration": {
+    "placeholders": {
+      "duration": {
+        "type": "String",
+        "example": "1.2s"
+      }
+    }
+  },
+  "@errorOperationFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@containersConfirmDelete": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@imagesLocalTags": {
+    "description": "Header of the tags panel.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@imagesUpdateQueue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@imagesUpdating": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@imagesUpdated": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@imagesUpdateSummary": {
+    "placeholders": {
+      "ok": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "@composeScanDone": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@composeService": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@diagSaved": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "@diagCopied": {
+    "placeholders": {
+      "bytes": {
+        "type": "int"
+      }
+    }
+  },
+  "@diagLastExport": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "@diagFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@aboutVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "@emptyLoadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "commonStarted": "已启动",
+  "commonStopped": "已停止",
+  "commonRestarted": "已重启",
+  "commonDeleted": "已删除",
+  "commonRunning": "进行中",
+  "commonLineCount": "{count} 行",
+  "@commonLineCount": {
+    "description": "Footer of the output panel: how many lines it holds.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commonCopiedToClipboard": "已复制到剪贴板",
+  "commonReadLogsFailed": "读取日志失败：",
+  "commonReadDetailsFailed": "读取详情失败：",
+  "commonReadStatsFailed": "读取统计失败：",
+  "containersTitle": "容器列表",
+  "containersNoStats": "（没有统计数据）",
+  "composeConfigLoadFailed": "项目配置加载失败：",
+  "composeStarted": "已启动 {name}",
+  "@composeStarted": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "composeStopped": "已停止 {name}",
+  "@composeStopped": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "composeRestarted": "已重启 {name}",
+  "@composeRestarted": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "composeRemoved": "已移除 {name}",
+  "@composeRemoved": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "composePulled": "已拉取 {name} 的镜像",
+  "@composePulled": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "composeBuilt": "已构建 {name} 的镜像",
+  "@composeBuilt": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "composeBuildImage": "构建镜像",
+  "composeFiles": "文件: {names}",
+  "@composeFiles": {
+    "placeholders": {
+      "names": {
+        "type": "String"
+      }
+    }
+  },
+  "composeLocalBuild": "（本地构建）",
+  "composeBuildContextValue": "构建: {context}",
+  "@composeBuildContextValue": {
+    "placeholders": {
+      "context": {
+        "type": "String"
+      }
+    }
+  },
+  "composeServiceList": "服务列表",
+  "composeServiceStarted": "已启动服务 {name}",
+  "@composeServiceStarted": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "composeServiceStopped": "已停止服务 {name}",
+  "@composeServiceStopped": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "composeServiceRestarted": "已重启服务 {name}",
+  "@composeServiceRestarted": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commonService": "服务",
+  "commonBuildContext": "构建上下文",
+  "composeRestartPolicy": "重启策略",
+  "composeRemoveConfirm": "将停止并删除 {name} 的全部容器与网络{volumes}。继续？",
+  "@composeRemoveConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "volumes": {
+        "type": "String"
+      }
+    }
+  },
+  "composeRemoveWithVolumes": "，同时删除命名卷（数据会丢失）",
+  "composeDetailPorts": "\n端口:\n",
+  "composeDetailMounts": "\n挂载:\n",
+  "composeDetailEnv": "\n环境变量:\n",
+  "composeDetailDependsOn": "\n依赖:\n",
+  "composeDetailNetworks": "\n网络:\n",
+  "composeDetailHealthcheck": "\n健康检查:\n",
+  "composeDetailLabels": "\n标签:\n",
+  "composeDetailHealthCommand": "  命令: {cmd}\n",
+  "@composeDetailHealthCommand": {
+    "placeholders": {
+      "cmd": {
+        "type": "String"
+      }
+    }
+  },
+  "composeDetailHealthInterval": "  间隔: {v}\n",
+  "@composeDetailHealthInterval": {
+    "placeholders": {
+      "v": {
+        "type": "String"
+      }
+    }
+  },
+  "composeDetailHealthTimeout": "  超时: {v}\n",
+  "@composeDetailHealthTimeout": {
+    "placeholders": {
+      "v": {
+        "type": "String"
+      }
+    }
+  },
+  "composeDetailHealthRetries": "  重试: {n}\n",
+  "@composeDetailHealthRetries": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "composeHasNoContainers": "{name} 还没有容器，先启动项目",
+  "@composeHasNoContainers": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "composeUpPreview": "up 预览 · {dir}",
+  "@composeUpPreview": {
+    "placeholders": {
+      "dir": {
+        "type": "String"
+      }
+    }
+  },
+  "composeProjectPath": "项目路径",
+  "composeRunningAction": "正在执行 wslc-compose {action}",
+  "@composeRunningAction": {
+    "placeholders": {
+      "action": {
+        "type": "String"
+      }
+    }
+  },
+  "composeExecuteFailed": "执行失败：",
+  "composeContainerState": "容器状态 · {name}",
+  "@composeContainerState": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "composeLogsTitle": "日志 · {name}",
+  "@composeLogsTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "composeServiceTitle": "服务 · {name}",
+  "@composeServiceTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "composePullFailed": "拉取失败：",
+  "composeReadFailed": "读取失败：",
+  "composeGenerateFailed": "生成失败：",
+  "composeOperationFailed": "操作失败：",
+  "composeFinishWithDuration": "\n\n完成（耗时 {duration}）",
+  "@composeFinishWithDuration": {
+    "placeholders": {
+      "duration": {
+        "type": "String"
+      }
+    }
+  },
+  "commonDeleteVolume": "删除卷 {name}",
+  "@commonDeleteVolume": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commonDeleteVolumeData": "删除卷 {name} 会永久丢失其中的数据，确定继续？",
+  "@commonDeleteVolumeData": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commonDeleteNetwork": "确定要删除网络 {name} 吗？",
+  "@commonDeleteNetwork": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commonDeleteImage": "确定要删除镜像 {name} 吗？",
+  "@commonDeleteImage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commonCreatedVolume": "已创建卷 {name}",
+  "@commonCreatedVolume": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commonCreatedNetwork": "已创建网络 {name}",
+  "@commonCreatedNetwork": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commonDeletedVolume": "已删除卷 {name}",
+  "@commonDeletedVolume": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commonDeletedNetwork": "已删除网络 {name}",
+  "@commonDeletedNetwork": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commonDeletedImage": "已删除镜像 {name}",
+  "@commonDeletedImage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "commonCopyName": "复制名称",
+  "volumesNewEllipsis": "新建卷…",
+  "networksNewEllipsis": "新建网络…",
+  "imagesDeleteSelected": "删除选中的镜像",
+  "imagesCopyRef": "复制引用",
+  "imagesCopyID": "复制镜像 ID",
+  "imagesFullRef": "完整引用",
+  "imagesTagsFor": "查看同仓库标签",
+  "imagesRepoLine": "仓库: {repo}\n",
+  "@imagesRepoLine": {
+    "placeholders": {
+      "repo": {
+        "type": "String"
+      }
+    }
+  },
+  "imagesLocalTagsHeader": "本地共有 {count} 个标签\n\n",
+  "@imagesLocalTagsHeader": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "imagesTagsPanel": "标签 · {ref}",
+  "@imagesTagsPanel": {
+    "placeholders": {
+      "ref": {
+        "type": "String"
+      }
+    }
+  },
+  "imagesImagePanel": "镜像 · {ref}",
+  "@imagesImagePanel": {
+    "placeholders": {
+      "ref": {
+        "type": "String"
+      }
+    }
+  },
+  "imagesPullPanel": "拉取镜像 · {ref}",
+  "@imagesPullPanel": {
+    "placeholders": {
+      "ref": {
+        "type": "String"
+      }
+    }
+  },
+  "imagesCurrentTagMark": "\n(* 表示当前选中的标签)\n",
+  "imagesPullFailedBlock": "\n\n拉取失败：",
+  "imagesDoneBlock": "\n\n完成。",
+  "imagesOk": "✓ 成功",
+  "imagesFailed": "✗ 失败：",
+  "imagesUpdatingBlock": "准备更新 {count} 个镜像…\n",
+  "@imagesUpdatingBlock": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "imagesUpdatedBlock": "已更新 {count} 个镜像",
+  "@imagesUpdatedBlock": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "imagesUpdateQueueBlock": "将依次重新拉取以下 {count} 个镜像：\n\n{list}",
+  "@imagesUpdateQueueBlock": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "list": {
+        "type": "String"
+      }
+    }
+  },
+  "imagesUpdateWillPull": "将重新拉取 {ref}",
+  "@imagesUpdateWillPull": {
+    "placeholders": {
+      "ref": {
+        "type": "String"
+      }
+    }
+  },
+  "imagesAndMore": "\n… 等共 {count} 个",
+  "@imagesAndMore": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "imagesUpdateSummaryBlock": "\n===== 完成：成功 {ok} 个，失败 {failed} 个 =====",
+  "@imagesUpdateSummaryBlock": {
+    "placeholders": {
+      "ok": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "imagesStartedPull": "开始拉取 {ref}",
+  "@imagesStartedPull": {
+    "placeholders": {
+      "ref": {
+        "type": "String"
+      }
+    }
+  },
+  "imagesPulled": "已拉取 {ref}",
+  "@imagesPulled": {
+    "placeholders": {
+      "ref": {
+        "type": "String"
+      }
+    }
+  },
+  "imagesUpdatedOne": "已更新 {ref}",
+  "@imagesUpdatedOne": {
+    "placeholders": {
+      "ref": {
+        "type": "String"
+      }
+    }
+  },
+  "imagesUpdateAllTitle": "一键更新全部镜像",
+  "imagesPullFromRepo": "从仓库下载镜像",
+  "systemContainersRunning": "{running} 运行中",
+  "@systemContainersRunning": {
+    "placeholders": {
+      "running": {
+        "type": "int"
+      }
+    }
+  },
+  "systemResourceOverview": "资源概览",
+  "systemPruneContainers": "清理容器",
+  "systemPruneImages": "清理镜像",
+  "systemPruneWarning": "清理操作会永久删除数据，请谨慎使用。",
+  "systemRecheckEnv": "重新检测环境",
+  "systemNoSessions": "（未读取到会话信息）",
+  "systemLastExport": "上次导出: {path}",
+  "@systemLastExport": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "systemElevationLine": "不同提权级别（普通 / 管理员）的终端拥有彼此独立的 wslc 会话，容器、镜像、网络、卷互不可见。",
+  "systemDiagHint": "遇到布局错位、点击无反应等问题时，导出一份报告发给我，里面有环境版本、当前界面元素坐标、最近命令与错误日志。",
+  "systemDiagE2EHint": "界面元素坐标需要以 e2e 标记构建并设置 MYGO_AUTOMATION；用 scripts\\diag.ps1 可一键完成。",
+  "settingsZeroDisables": "0 表示关闭",
+  "settingsProjectScan": "项目扫描",
+  "settingsAddedProjects": "已添加的项目",
+  "settingsNoScanDirs": "（没有可扫描的目录，可手动添加项目）",
+  "settingsOpenDirFailed": "打开目录失败: {error}",
+  "@settingsOpenDirFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "logsDiagPanel": "诊断报告 · {title}",
+  "@logsDiagPanel": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "logsGenerateFailed": "生成失败: {error}",
+  "@logsGenerateFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "logsDiagSavedTo": "诊断报告已保存到 {path}",
+  "@logsDiagSavedTo": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "logsDiagGenerateFailed": "生成诊断报告失败: {error}",
+  "@logsDiagGenerateFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "logsCannotReadFile": "（无法读取文件: {path}）",
+  "@logsCannotReadFile": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "shotSaved": "已保存截图 {path}",
+  "@shotSaved": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "shotFailed": "截图失败: {error}",
+  "@shotFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "shotWriteFailed": "写入截图失败: {error}",
+  "@shotWriteFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "shotMkdirFailed": "创建截图目录失败: {error}",
+  "@shotMkdirFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "commonActionFailed": "操作失败: {error}",
+  "@commonActionFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "systemSessionsEmpty": "（未读取到会话信息）",
+  "systemResourcesOverview": "资源概览",
+  "systemRunningCount": "{running} 运行中",
+  "@systemRunningCount": {
+    "placeholders": {
+      "running": {
+        "type": "int"
+      }
+    }
+  },
+  "systemMaintenanceHint": "清理操作会永久删除数据，请谨慎使用。",
+  "diagE2eHint": "界面元素坐标需要以 e2e 标记构建并设置 MYGO_AUTOMATION；用 scripts\\diag.ps1 可一键完成。",
+  "imagesPullFailed": "拉取失败：",
+  "commonBrowse": "浏览…",
+  "errorDialogUnavailable": "当前环境无法打开文件对话框",
+  "settingsBrowseDir": "选择目录",
+  "settingsScanDirPlaceholder": "新增扫描目录，例如 E:\\Project",
+  "composeAddPathPlaceholder": "例如 E:\\Project\\my-app",
+  "envTitle": "依赖环境",
+  "envDetecting": "正在检测环境…",
+  "envInstalled": "已安装 {version}",
+  "@envInstalled": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "envMissing": "未安装",
+  "envWslHint": "wslc 由 WSL 提供，不在本应用内单独安装。安装或更新 WSL 即可获得它。",
+  "envInstallWSL": "安装 WSL",
+  "envUpdateWSL": "更新 WSL",
+  "envUpdateWSLConfirm": "将用 winget 更新 WSL。更新期间正在运行的容器可能被停止，完成后通常需要重启终端。继续？",
+  "envNoWinget": "没有找到 winget：请从 Microsoft Store 安装「应用安装程序」，或手动安装 WSL。",
+  "envOutdated": "有新版本可用：{current} → {latest}",
+  "@envOutdated": {
+    "placeholders": {
+      "current": {
+        "type": "String"
+      },
+      "latest": {
+        "type": "String"
+      }
+    }
+  },
+  "envInstallCompose": "安装 wslc-compose",
+  "envInstallComposeVersion": "安装 wslc-compose {version}",
+  "@envInstallComposeVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "envUpgradeCompose": "升级 wslc-compose",
+  "envNoUpgrader": "没有找到 uv 或 pipx。请先安装其中之一，才能一键安装 wslc-compose。",
+  "envInstalling": "安装 · {tool}",
+  "@envInstalling": {
+    "placeholders": {
+      "tool": {
+        "type": "String"
+      }
+    }
+  },
+  "envInstallDone": "操作完成。",
+  "envInstallFailed": "失败：{error}",
+  "@envInstallFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAccent": "强调色",
+  "settingsAccentHint": "用于主按钮、焦点框和选中的行。",
+  "accentMagenta": "品红",
+  "accentViolet": "紫罗兰",
+  "accentBlue": "蓝",
+  "accentTeal": "青绿",
+  "accentAmber": "琥珀",
+  "accentGreen": "绿"
+}

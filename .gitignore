@@ -1,0 +1,22 @@
+# MyGo 构建产物
+/build/
+/.mygo/
+mygo_windows_*.syso
+
+# 本地调试与临时文件
+*.exe
+*.log
+*.tmp
+/tmp/
+node_modules/
+
+# 诊断脚本产物
+/.diag/
+
+# 开发笔记与计划文档：不随仓库发布
+/docs/note/
+/docs/plan/
+
+# 子代理与工具产生的临时文件
+/.tmpi18n/
+/.agents/

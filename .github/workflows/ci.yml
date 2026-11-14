@@ -1,0 +1,81 @@
+name: CI
+
+# 每次 push 到 main、以及每个 PR 都跑：格式、静态检查、测试。
+# 这是「不让坏代码进主干」的那道闸；发布由 release.yml 负责。
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          # 与 go.mod 保持一致；setup-go 会读 go.mod 的 go 指令。
+          go-version-file: go.mod
+          cache: true
+
+      # 界面测试要真正布局一帧，需要 cgo 的字体栈。
+      - name: Enable cgo
+        shell: pwsh
+        run: echo "CGO_ENABLED=1" >> $env:GITHUB_ENV
+
+      - name: gofmt
+        shell: pwsh
+        run: |
+          # 列出未格式化的文件；有就失败。
+          $files = gofmt -l internal cmd main.go 2>$null
+          if ($files) {
+            Write-Host "以下文件未格式化：" -ForegroundColor Red
+            $files | ForEach-Object { Write-Host "  $_" }
+            exit 1
+          }
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: mygo vet
+        run: go tool mygo vet .
+
+      - name: Test
+        run: go test ./... -count=1
+
+      - name: Test with race detector
+        # 状态在本应用里跨 goroutine 共享（后台操作 → 主线程更新），
+        # 竞态检测是这里最有价值的一道检查。
+        run: go test -race ./internal/app/ -count=1
+
+      - name: Build
+        run: go build ./...
+
+  # 保证词表与源码一致：代码里用到的每条文案都要有英文翻译。
+  locales:
+    name: Check translations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Verify generated accessors are up to date
+        # mygo generate 是生成的代码；改了词表却忘了重新生成，
+        # 这里会拦下来，避免出现「改了翻译但界面没变」。
+        run: |
+          go tool mygo i18n check
+          go tool mygo generate
+          if ! git diff --quiet; then
+            echo "::error::locales/catalog_gen.go 与词表不同步，请本地运行 'go tool mygo generate' 并提交"
+            git diff
+            exit 1
+          fi

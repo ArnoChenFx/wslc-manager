@@ -1,0 +1,139 @@
+name: Release
+
+# 打 vX.X.X 标签即发布。
+#
+# 流程：
+#   1. 把 mygo.json 的 version 改成标签对应的版本号（构建产物与安装包名都取它）；
+#   2. mygo build 产出便携版可执行文件 + NSIS 安装包；
+#   3. 打成 zip、生成校验和，上传到该标签的 GitHub Release。
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # 创建 Release 与上传产物
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Enable cgo
+        shell: pwsh
+        run: echo "CGO_ENABLED=1" >> $env:GITHUB_ENV
+
+      - name: Test before publishing
+        # 发布前必须绿：标签打错还能删，发出去的坏二进制会被人下载。
+        run: go test ./... -count=1
+
+      - name: Set version from tag
+        id: version
+        shell: pwsh
+        run: |
+          # 标签形如 v0.2.0，版本号取掉前缀的 0.2.0。
+          $tag = "${{ github.ref_name }}"
+          $ver = $tag -replace '^v', ''
+          if ($ver -notmatch '^\d+\.\d+\.\d+') {
+            Write-Host "标签格式不对：$tag，应为 vX.Y.Z" -ForegroundColor Red
+            exit 1
+          }
+          Write-Host "版本号：$ver"
+
+          # 回写 mygo.json，让产物与安装包都带上这个版本。
+          $path = "mygo.json"
+          $json = Get-Content $path -Raw | ConvertFrom-Json
+          $json.version = $ver
+          $json | ConvertTo-Json -Depth 20 | Set-Content $path -Encoding utf8
+
+          "version=$ver" >> $env:GITHUB_OUTPUT
+
+      - name: Build
+        shell: pwsh
+        run: go tool mygo build -platform windows/amd64
+
+      - name: Package
+        id: package
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.version.outputs.version }}"
+          $out = "build/windows-amd64"
+
+          # 便携版：exe + 图标 + 说明，解压即用。
+          $zip = "WSLC-Manager-$ver-windows-amd64.zip"
+          New-Item -ItemType Directory -Force -Path stage | Out-Null
+          Copy-Item "$out/WSLC Manager.exe" stage/
+          Copy-Item "README.md" stage/
+          Copy-Item "README-zh.md" stage/
+          Copy-Item "LICENSE" stage/ -ErrorAction SilentlyContinue
+          Compress-Archive -Path "stage/*" -DestinationPath $zip -Force
+
+          # 安装包由 mygo build 生成，重命名成带版本号的稳定名字。
+          $setup = Get-ChildItem "$out/*setup*.exe" | Select-Object -First 1
+          if (-not $setup) { throw "没有找到安装包" }
+          $setupName = "WSLC-Manager-Setup-$ver-windows-amd64.exe"
+          Copy-Item $setup.FullName $setupName
+
+          "zip=$zip" >> $env:GITHUB_OUTPUT
+          "setup=$setupName" >> $env:GITHUB_OUTPUT
+
+      - name: Checksums
+        shell: pwsh
+        run: |
+          $files = @("${{ steps.package.outputs.zip }}", "${{ steps.package.outputs.setup }}")
+          $lines = foreach ($f in $files) {
+            $hash = (Get-FileHash $f -Algorithm SHA256).Hash.ToLower()
+            "$hash  $f"
+          }
+          $lines | Set-Content SHA256SUMS.txt -Encoding utf8
+          Get-Content SHA256SUMS.txt
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: WSLC Manager ${{ steps.version.outputs.version }}
+          draft: false
+          generate_release_notes: true
+          files: |
+            ${{ steps.package.outputs.zip }}
+            ${{ steps.package.outputs.setup }}
+            SHA256SUMS.txt
+          body: |
+            ## WSLC Manager ${{ steps.version.outputs.version }}
+
+            Manage WSL containers (`wslc`) on Windows.
+
+            **Downloads**
+            - `${{ steps.package.outputs.setup }}` — installer (recommended)
+            - `${{ steps.package.outputs.zip }}` — portable, extract and run
+            - `SHA256SUMS.txt` — verify your download
+
+            **Requirements**
+            - Windows 10/11 with WSL (`winget install Microsoft.WSL`)
+            - `wslc-compose` (`uv tool install wslc-compose`)
+
+            Both are checked on the **System** page, which can install them for you.
+
+            ---
+
+            在 Windows 上管理 WSL 容器（`wslc`）。
+
+            **下载**
+            - `${{ steps.package.outputs.setup }}` — 安装包（推荐）
+            - `${{ steps.package.outputs.zip }}` — 便携版，解压即用
+            - `SHA256SUMS.txt` — 校验下载完整性
+
+            **依赖**
+            - Windows 10/11 与 WSL（`winget install Microsoft.WSL`）
+            - `wslc-compose`（`uv tool install wslc-compose`）
+
+            两者都会在**系统信息**页检查，并可一键安装。

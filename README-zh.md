@@ -1,0 +1,114 @@
+# WSLC Manager
+
+在 Windows 上管理 [WSL 容器](https://learn.microsoft.com/windows/wsl/wsl-container)（`wslc`）的桌面应用——类似 Docker Desktop，但管理的是 `wslc`。
+
+用 **Go** 和 [MyGo](https://github.com/egoist/mygo) 的原生 UI 构建：没有 webview，没有 Electron，不需要 Node。单个可执行文件，启动即出界面。
+
+<p align="center">
+  <img src="resources/icon.png" width="120" alt="WSLC Manager 图标">
+</p>
+
+<p align="center">
+  <a href="README.md">English</a>
+</p>
+
+---
+
+## 它能做什么
+
+`wslc` 是 WSL 自带的容器命令行工具。WSLC Manager 给它套上一个真正的界面。
+
+### 容器
+列出、启动、停止、重启、删除容器。资源占用、`inspect` 详情、流式日志都在同一个窗口里，上下面板可拖动调整比例。
+
+### 镜像
+查看本地镜像的大小与创建时间。拉取镜像时**实时显示进度**，查看同仓库的所有标签，跳到详情或资源占用，也可以一次更新全部镜像。
+
+### 卷与网络
+创建、查看、删除命名卷与网络。内置网络受保护，不会被误删。
+
+### Compose 项目
+指向一个包含 `compose.yaml`（或 `docker-compose.yml`）的目录，就能管理整组服务：启动、停止、重启、构建、拉取、移除，以及逐个服务控制。
+
+Compose 文件**不由本应用解析**。所有动作都交给 [`wslc-compose`](https://github.com/bacarndiaye/wslc-compose)，并向它索取解析后的配置。变量插值、`.env`、include、卷名前缀重写的行为与实际运行完全一致——界面所示即实际运行。
+
+### 系统
+环境版本、WSL 会话，以及一键依赖检查：缺什么就装什么、旧了就升级。
+
+### 诊断
+遇到布局错位或点了没反应的按钮？导出一份诊断报告：环境版本、界面上每个元素的精确坐标、最近的命令与错误日志，全在一个 Markdown 文件里。另外还有实时运行日志，记录每一次 `wslc` / `wslc-compose` 调用。
+
+### 中英双语
+在设置里切换中文和英文，选择会被记住。
+
+---
+
+## 环境要求
+
+| 组件 | 是什么 | 怎么装 |
+|---|---|---|
+| **Windows 10/11** | — | — |
+| **支持容器的 WSL** | 提供 `wslc.exe` | `winget install Microsoft.WSL`，或 `wsl --update` |
+| **wslc-compose** | Compose 编排（第三方，Python） | `uv tool install wslc-compose` 或 `pipx install wslc-compose` |
+
+应用会在**系统信息**页检查这两项，并在本机有 `winget` 和 `uv`/`pipx` 时帮你一键安装或升级。`wslc` 属于 WSL，所以应用不会单独下载它——而是更新 WSL。
+
+> `wslc-compose` 是另一个独立开源项目。本应用依赖它，而不是重写一套 Compose，这样行为始终与真实工具一致。
+
+---
+
+## 安装
+
+### 便携版
+
+从 [Releases](https://github.com/ArnoChenFx/wslc-manager/releases) 下载 `WSLC-Manager-<版本>-windows-amd64.zip`，解压到任意位置，运行 `WSLC Manager.exe`。
+
+### 安装包
+
+下载并运行 `wslc-manager-setup-<版本>-amd64.exe`，会安装应用并创建开始菜单项。
+
+### 从源码构建
+
+```powershell
+git clone https://github.com/ArnoChenFx/wslc-manager.git
+cd wslc-manager
+go build -o "WSLC Manager.exe" .
+```
+
+需要 Go 1.25 或更高版本。
+
+---
+
+## 快速上手
+
+1. **启动一个容器** —— 打开 **Compose 项目** 页，点 **添加项目**，选择包含 `compose.yaml` 的目录。选中项目后点 **启动**。
+2. **或者拉一个镜像** —— 打开 **镜像** 页，点 **拉取镜像**，输入 `nginx:alpine` 这样的引用。
+3. **看它跑起来** —— **容器** 页会自动更新。双击某一行查看日志。
+
+如果有依赖没装好，**系统信息** 页会告诉你是哪一个，并提供一键安装。
+
+---
+
+## 注意事项与限制
+
+`wslc` 还处在公开预览阶段，有一些真实存在的限制，应用里都会提示：
+
+- 同一时刻只容忍一个 `wslc` 调用。本应用已自动把所有调用串行化。
+- 暂不支持 `pause` / `unpause`，以及 `unless-stopped` / `on-failure` 重启策略。
+- 单个 WSL 会话最多挂载约 15 个卷，超出会报 *Too many volumes have been mounted*；用 `wsl --shutdown` 重置。
+- 发布的端口绑定在 Windows 回环地址上，需要在 Windows 侧测试。
+- 不同提权级别（普通 / 管理员）的终端拥有彼此独立的 `wslc` 会话，互相看不到对方的容器。
+
+---
+
+## 技术栈
+
+- **[Go](https://go.dev)** —— 单一静态二进制，目标机器无需安装运行时。
+- **[MyGo](https://github.com/egoist/mygo)** —— 纯 Go 的原生桌面 UI。布局、主题、控件、系统原生文件对话框、平台窗口都由它提供。没有 HTML，没有 JavaScript，不打包浏览器。
+- **[wslc-compose](https://github.com/bacarndiaye/wslc-compose)** —— Compose 编排，作为外部命令调用。
+
+---
+
+## 许可
+
+MIT

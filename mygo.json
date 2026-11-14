@@ -1,0 +1,12 @@
+{
+  "name": "WSLC Manager",
+  "slug": "wslc-manager",
+  "identifier": "dev.wslc.manager",
+  "version": "0.1.0",
+  "copyright": "© 2026 ArnoChen",
+  "out": "build",
+  "i18n": {
+    "dir": "locales",
+    "source": "zh-Hans"
+  }
+}
