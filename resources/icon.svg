@@ -1,36 +1,56 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <!--
-    WSLC Manager 图标
-
-    设计原则（这一版为小尺寸重做）：
-    - 只有两个形状：上面大的「容器层」+ 下面较暗的同类层。
-      元素越少，缩小后越不容易糊成一团。
-    - 主形占画布约 55%，16px 下仍有足够像素表达轮廓。
-    - 提示符 >_ 用粗笔画，且两笔之间留足空隙——
-      否则大尺寸下会连成一块黑色，读不出是终端。
-    - 深色底 + 亮蓝主形，任务栏里对比强、好定位。
-
-    上一版的问题：三层横条挨得太近，缩到 32px 后
-    融成一片横纹，既看不出容器也看不出终端。
+    层叠容器，无提示符。
+    在第一轮方案 A 上只去掉顶层「>」，其余堆叠、比例、配色不变。
+    顶卡用一层很淡的左上高光补体积，避免挖掉符号后显得空，
+    不加任何新图形或文字。
   -->
+  <defs>
+    <linearGradient id="a-tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#171E2C"/>
+      <stop offset="100%" stop-color="#0A0F18"/>
+    </linearGradient>
+    <linearGradient id="a-top" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8AD0FF"/>
+      <stop offset="100%" stop-color="#3B8EFF"/>
+    </linearGradient>
+    <linearGradient id="a-mid" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2F6AE0"/>
+      <stop offset="100%" stop-color="#1A4BB8"/>
+    </linearGradient>
+    <linearGradient id="a-bot" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#163A7A"/>
+      <stop offset="100%" stop-color="#0C2760"/>
+    </linearGradient>
+    <!-- 顶卡左上高光：很淡，只补体积 -->
+    <linearGradient id="a-sheen" x1="0.12" y1="0" x2="0.55" y2="0.85">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.42"/>
+      <stop offset="38%" stop-color="#ffffff" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="a-tile-clip">
+      <rect width="1024" height="1024" rx="228"/>
+    </clipPath>
+    <clipPath id="a-top-clip">
+      <rect x="212" y="256" width="600" height="264" rx="72"/>
+    </clipPath>
+  </defs>
 
-  <!-- 圆角方形底 -->
-  <rect width="1024" height="1024" rx="228" fill="#101722"/>
+  <rect width="1024" height="1024" rx="228" fill="url(#a-tile)"/>
+  <rect width="1024" height="1024" rx="228" fill="none"
+        stroke="#ffffff" stroke-opacity="0.10" stroke-width="8"
+        clip-path="url(#a-tile-clip)"/>
 
-  <!-- 下层容器：较暗、略收窄，暗示「还有一层」 -->
-  <rect x="268" y="552" width="488" height="192" rx="96" fill="#1c6499"/>
+  <!-- 下层略宽，小尺寸下侧面也能看出「叠」 -->
+  <rect x="172" y="516" width="680" height="264" rx="72" fill="url(#a-bot)"/>
+  <rect x="192" y="386" width="640" height="264" rx="72" fill="url(#a-mid)"/>
+  <rect x="212" y="256" width="600" height="264" rx="72" fill="url(#a-top)"/>
 
-  <!-- 上层容器：主形，亮蓝，承载提示符 -->
-  <rect x="228" y="280" width="568" height="288" rx="120" fill="#3d9bfd"/>
-
-  <!--
-    提示符 >_
-    箭头收在左侧一半，下划线放在右下且与之保持明显间隙，
-    保证大小两种尺寸下都能读出「两个符号」。
-  -->
-  <g fill="none" stroke="#0a0f18" stroke-width="88"
-     stroke-linecap="round" stroke-linejoin="round">
-    <path d="M352 344 L466 400 L352 456"/>
-    <path d="M544 442 L636 442"/>
-  </g>
+  <!-- 顶卡高光，裁在卡片圆角内 -->
+  <rect x="212" y="256" width="600" height="264" rx="72"
+        fill="url(#a-sheen)" clip-path="url(#a-top-clip)"/>
+  <!-- 顶沿一条更淡的亮边，让卡片有一点厚度 -->
+  <path d="M 284 268 H 740"
+        fill="none" stroke="#ffffff" stroke-opacity="0.28" stroke-width="8"
+        stroke-linecap="round" clip-path="url(#a-top-clip)"/>
 </svg>
