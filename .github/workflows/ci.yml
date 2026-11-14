@@ -1,7 +1,8 @@
 name: CI
 
-# 每次 push 到 main、以及每个 PR 都跑：格式、静态检查、测试。
-# 这是「不让坏代码进主干」的那道闸；发布由 release.yml 负责。
+# Runs on every push to main and on every pull request: formatting,
+# static checks, tests. This is the gate that keeps broken code out of
+# main; publishing is handled by release.yml.
 on:
   push:
     branches: [main]
@@ -20,11 +21,11 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          # 与 go.mod 保持一致；setup-go 会读 go.mod 的 go 指令。
+          # Matches go.mod; setup-go reads the go directive from it.
           go-version-file: go.mod
           cache: true
 
-      # 界面测试要真正布局一帧，需要 cgo 的字体栈。
+      # The UI tests lay out real frames, which needs cgo's font stack.
       - name: Enable cgo
         shell: pwsh
         run: echo "CGO_ENABLED=1" >> $env:GITHUB_ENV
@@ -32,22 +33,23 @@ jobs:
       - name: gofmt
         shell: pwsh
         run: |
-          # 列出未格式化的文件；有就失败。
+          # List files that are not formatted; fail if there are any.
           #
-          # 注意：Windows 上若 core.autocrlf 把文件检出成 CRLF，
-          # gofmt 会把所有文件都报成未格式化。仓库根有 .gitattributes
-          # 强制 LF，这里再显式关掉换行转换，双重保证。
+          # Note: on Windows, if core.autocrlf checks files out as CRLF,
+          # gofmt reports every file as unformatted. The repository has a
+          # .gitattributes forcing LF, and this turns the conversion off
+          # as a second guard.
           git config --global core.autocrlf false
 
           $files = @(gofmt -l internal cmd main.go 2>$null)
           if ($files.Count -gt 0) {
-            Write-Host "以下文件未格式化：" -ForegroundColor Red
+            Write-Host "These files are not formatted:" -ForegroundColor Red
             $files | ForEach-Object { Write-Host "  $_" }
-            Write-Host "" 
-            Write-Host "本地执行 'gofmt -w internal cmd main.go' 修复。" -ForegroundColor Yellow
+            Write-Host ""
+            Write-Host "Run 'gofmt -w internal cmd main.go' locally to fix." -ForegroundColor Yellow
             exit 1
           }
-          Write-Host "所有 Go 文件格式正确" -ForegroundColor Green
+          Write-Host "All Go files are properly formatted" -ForegroundColor Green
 
       - name: go vet
         run: go vet ./...
@@ -58,15 +60,18 @@ jobs:
       - name: Test
         run: go test ./... -count=1
 
+      # State is shared across goroutines here (background operations
+      # updating the main thread), so the race detector is the most
+      # valuable check we have.
       - name: Test with race detector
-        # 状态在本应用里跨 goroutine 共享（后台操作 → 主线程更新），
-        # 竞态检测是这里最有价值的一道检查。
         run: go test -race ./internal/app/ -count=1
 
       - name: Build
         run: go build ./...
 
-  # 保证词表与源码一致：代码里用到的每条文案都要有英文翻译。
+  # Keeps the catalogs and the source in sync: every string used in code
+  # must have an English translation, and the generated accessors must
+  # match the catalogs.
   locales:
     name: Check translations
     runs-on: ubuntu-latest
@@ -78,13 +83,14 @@ jobs:
           cache: true
 
       - name: Verify generated accessors are up to date
-        # mygo generate 是生成的代码；改了词表却忘了重新生成，
-        # 这里会拦下来，避免出现「改了翻译但界面没变」。
+        # mygo generate produces generated code. Editing a catalog without
+        # regenerating would otherwise slip through, giving the confusing
+        # symptom "translation changed but the UI did not".
         run: |
           go tool mygo i18n check
           go tool mygo generate
           if ! git diff --quiet; then
-            echo "::error::locales/catalog_gen.go 与词表不同步，请本地运行 'go tool mygo generate' 并提交"
+            echo "::error::locales/catalog_gen.go is out of sync with the catalogs; run 'go tool mygo generate' and commit"
             git diff
             exit 1
           fi

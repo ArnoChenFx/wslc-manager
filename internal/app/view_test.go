@@ -10,6 +10,7 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"github.com/arno/wslc-manager/internal/compose"
+	"github.com/arno/wslc-manager/internal/envsetup"
 	"github.com/arno/wslc-manager/internal/store"
 	"github.com/arno/wslc-manager/internal/wslc"
 	"github.com/arno/wslc-manager/locales"
@@ -24,6 +25,24 @@ func newTestApp(t *testing.T) *App {
 	a.settings = store.DefaultSettings()
 	a.settings.Projects = nil
 	a.settings.ScanRoots = nil
+
+	// 固定依赖环境状态，别让测试去探本机。
+	//
+	// 两个原因：
+	//   1. 检测会启动后台命令（wsl.exe / uv），测试不该碰真实环境；
+	//   2. 检测结果异步回填会改变系统页卡片高度，
+	//      测量类断言会因此随机失败（CI 上就真的踩到过：
+	//      同一份代码本地过、CI 报「最后一行高度为 0」）。
+	a.envChecked = true
+	a.env = envsetup.Status{
+		WSLCPath:       `C:\Program Files\WSL\wslc.exe`,
+		WSLVersion:     "3.0.5.0",
+		ComposePath:    `C:\tools\wslc-compose.exe`,
+		ComposeVersion: "0.6.0",
+		Latest:         "0.6.0",
+		Upgrader:       "uv",
+		CheckedAt:      time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+	}
 	return a
 }
 
@@ -876,8 +895,12 @@ func TestViewRendersWithLocales(t *testing.T) {
 			sampleData(a)
 			a.page = PageContainers
 
+			// 渲染完必须把全局语言来源恢复，
+			// 否则同包后续测试会全部跑在英文下（曾经真的污染过：
+			// 后面的测试按中文文案查找元素，直接找不到）。
+			t.Cleanup(func() { i18n.SetLocaleFunc(nil) })
+
 			tt := ui.NewTester(func(c *ui.Context) {
-				// 每次渲染前显式指定语言，避免依赖全局状态。
 				a.viewForLocale(c, locale)
 			}, 1180, 760)
 			tt.Frame()
@@ -912,4 +935,43 @@ func localesIn(locale string) locales.Messages {
 func (a *App) viewForLocale(c *ui.Context, locale string) {
 	i18n.SetLocaleFunc(func() string { return locale })
 	a.View(c)
+}
+
+// TestSystemPageStableWithoutCompose 验证缺少 wslc-compose 时系统页布局稳定。
+//
+// 回归测试：CI 曾报「最后一行高度为 0」，同一份代码本地却是好的。
+// 根因是视图里发起了依赖检测——检测结果异步回填会改变卡片高度，
+// 渲染中途布局变化，测量结果就不稳定。CI 机器上没有 wslc-compose，
+// 检测走的路径不同、耗时更长，于是必然撞上。
+//
+// 现在检测移到 Init，newTestApp 显式固定环境状态，视图彻底不碰 IO。
+func TestSystemPageStableWithoutCompose(t *testing.T) {
+	a := newTestApp(t)
+	sampleData(a)
+	a.page = PageSystem
+
+	// 缺少 compose 的场景：卡片内容与完全就绪时不同。
+	a.compose = nil
+	a.composeErr = "wslc-compose 未找到"
+	a.env.ComposePath = ""
+	a.env.ComposeVersion = ""
+	a.env.Upgrader = ""
+
+	const W, H = 1180, 760
+	tt := ui.NewTester(a.View, W, H)
+	// 多渲染几帧：任何「首帧正常、后续抖动」的问题都会暴露。
+	for i := 0; i < 3; i++ {
+		tt.Frame()
+	}
+	tt.Scroll(float32(W)/2, float32(H)/2, 0, 10000)
+	tt.Frame()
+
+	last := "• 当前版本不支持 pause/unpause、unless-stopped / on-failure 重启策略。"
+	r, ok := tt.Find(last)
+	if !ok {
+		t.Fatal("滚到底后找不到最后一行")
+	}
+	if r.H < 14 {
+		t.Errorf("最后一行被裁切：H=%.1f", r.H)
+	}
 }

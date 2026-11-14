@@ -1,18 +1,19 @@
 name: Release
 
-# 打 vX.X.X 标签即发布。
+# Publishing a vX.X.X tag publishes a release.
 #
-# 流程：
-#   1. 把 mygo.json 的 version 改成标签对应的版本号（构建产物与安装包名都取它）；
-#   2. mygo build 产出便携版可执行文件 + NSIS 安装包；
-#   3. 打成 zip、生成校验和，上传到该标签的 GitHub Release。
+# Steps:
+#   1. Set mygo.json's version to the tag's version (build artifacts and
+#      the installer name both take it from there).
+#   2. mygo build produces the portable executable and the NSIS installer.
+#   3. Zip, checksums, and upload to the GitHub release of that tag.
 on:
   push:
     tags:
       - "v*"
 
 permissions:
-  contents: write # 创建 Release 与上传产物
+  contents: write # create the release and upload artifacts
 
 jobs:
   release:
@@ -32,24 +33,26 @@ jobs:
         shell: pwsh
         run: echo "CGO_ENABLED=1" >> $env:GITHUB_ENV
 
+      # Must be green before publishing: a wrong tag can be deleted,
+      # but a broken binary that people downloaded cannot be taken back.
       - name: Test before publishing
-        # 发布前必须绿：标签打错还能删，发出去的坏二进制会被人下载。
         run: go test ./... -count=1
 
       - name: Set version from tag
         id: version
         shell: pwsh
         run: |
-          # 标签形如 v0.2.0，版本号取掉前缀的 0.2.0。
+          # Tags look like v0.2.0; the version is 0.2.0.
           $tag = "${{ github.ref_name }}"
           $ver = $tag -replace '^v', ''
           if ($ver -notmatch '^\d+\.\d+\.\d+') {
-            Write-Host "标签格式不对：$tag，应为 vX.Y.Z" -ForegroundColor Red
+            Write-Host "Bad tag: $tag, expected vX.Y.Z" -ForegroundColor Red
             exit 1
           }
-          Write-Host "版本号：$ver"
+          Write-Host "Version: $ver"
 
-          # 回写 mygo.json，让产物与安装包都带上这个版本。
+          # Write it back into mygo.json so the artifacts and the
+          # installer carry this version.
           $path = "mygo.json"
           $json = Get-Content $path -Raw | ConvertFrom-Json
           $json.version = $ver
@@ -68,7 +71,7 @@ jobs:
           $ver = "${{ steps.version.outputs.version }}"
           $out = "build/windows-amd64"
 
-          # 便携版：exe + 图标 + 说明，解压即用。
+          # Portable: executable plus docs, extract and run.
           $zip = "WSLC-Manager-$ver-windows-amd64.zip"
           New-Item -ItemType Directory -Force -Path stage | Out-Null
           Copy-Item "$out/WSLC Manager.exe" stage/
@@ -77,9 +80,10 @@ jobs:
           Copy-Item "LICENSE" stage/ -ErrorAction SilentlyContinue
           Compress-Archive -Path "stage/*" -DestinationPath $zip -Force
 
-          # 安装包由 mygo build 生成，重命名成带版本号的稳定名字。
+          # The installer comes from mygo build; rename it to a stable,
+          # versioned name.
           $setup = Get-ChildItem "$out/*setup*.exe" | Select-Object -First 1
-          if (-not $setup) { throw "没有找到安装包" }
+          if (-not $setup) { throw "Installer not found" }
           $setupName = "WSLC-Manager-Setup-$ver-windows-amd64.exe"
           Copy-Item $setup.FullName $setupName
 
@@ -110,7 +114,7 @@ jobs:
           body: |
             ## WSLC Manager ${{ steps.version.outputs.version }}
 
-            Manage WSL containers (`wslc`) on Windows.
+            A desktop app for managing [WSL containers](https://learn.microsoft.com/windows/wsl/wsl-container) (`wslc`) on Windows.
 
             **Downloads**
             - `${{ steps.package.outputs.setup }}` — installer (recommended)
@@ -121,19 +125,13 @@ jobs:
             - Windows 10/11 with WSL (`winget install Microsoft.WSL`)
             - `wslc-compose` (`uv tool install wslc-compose`)
 
-            Both are checked on the **System** page, which can install them for you.
+            Both are checked on the **System** page, which can install or upgrade them for you.
 
-            ---
-
-            在 Windows 上管理 WSL 容器（`wslc`）。
-
-            **下载**
-            - `${{ steps.package.outputs.setup }}` — 安装包（推荐）
-            - `${{ steps.package.outputs.zip }}` — 便携版，解压即用
-            - `SHA256SUMS.txt` — 校验下载完整性
-
-            **依赖**
-            - Windows 10/11 与 WSL（`winget install Microsoft.WSL`）
-            - `wslc-compose`（`uv tool install wslc-compose`）
-
-            两者都会在**系统信息**页检查，并可一键安装。
+            **Highlights**
+            - Containers: start, stop, restart, remove, live stats and streaming logs
+            - Images: pull with live progress, browse tags, update one or all
+            - Volumes and networks: create, inspect, delete
+            - Compose projects: full stack control through `wslc-compose`
+            - Chinese and English UI, switchable in Settings
+            - Six accent colors
+            - Diagnostic reports with versions, element coordinates and recent logs

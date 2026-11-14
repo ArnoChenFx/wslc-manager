@@ -25,10 +25,14 @@ import (
 func (a *App) envCard(c *ui.Context) {
 	t := c.Theme()
 
-	// 首次渲染时触发一次后台检测；之后由「重新检测」刷新。
-	if !a.envChecked && !a.isBusy("env-detect") {
-		a.detectEnvironment()
-	}
+	// 这里**不**发起检测。
+	//
+	// 视图是「状态 → 界面」的纯函数，可能在同帧被调用多次；
+	// 在构建期启动后台任务会带来两个问题：
+	//   1. 违反分层约定，视图变成有副作用的；
+	//   2. 检测结果异步回填会改变布局高度，导致界面在渲染中途跳动
+	//      （测量类测试会因此随机失败——CI 上就真的踩到了）。
+	// 首次检测由 Init 触发，之后由「重新检测」按钮刷新。
 
 	a.infoCard(c, locales.EnvTitle(), func() {
 		if !a.envChecked {
