@@ -171,15 +171,6 @@ func (a *App) systemPage(c *ui.Context) {
 					ui.Text(c, ln).FontSize(12).TextColor(t.TextMuted).Selectable()
 				}
 			})
-
-			// 滚动内容末尾的显式缓冲。
-			//
-			// 只靠 Column 的 Padding 不够可靠：滚动到底时最后一行的
-			// 下半部分（包括行高留白）会被视口边缘裁掉，看起来像被切了。
-			// 加一个真实占位的 Spacer，保证滚到底时最后一行上方还有余量。
-			// 高度取 24 而不是行高量级：底部还有状态栏占去一部分视口，
-			// 留得太少时视觉上依旧贴边。
-			ui.Spacer(c).Height(24)
 		})
 	})
 }
