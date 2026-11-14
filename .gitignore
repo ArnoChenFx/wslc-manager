@@ -20,3 +20,4 @@ node_modules/
 # 子代理与工具产生的临时文件
 /.tmpi18n/
 /.agents/
+dist/
