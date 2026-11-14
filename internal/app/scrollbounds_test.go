@@ -17,6 +17,8 @@ import (
 // 可用高度被高估 82px，下半栏被排到窗口外。
 //
 // 这里把各种上下比例都过一遍，断言滚动区底部始终不超出窗口。
+// （此前这里只打日志、不判失败，外层分栏退回 Fill() 时测试照样通过，
+// 等于没有守住；现在越界就报错。）
 func TestScrollbarInsideWindow(t *testing.T) {
 	for _, pct := range []float32{30, 50, 58, 70, 80, 90, 99} {
 		a := newTestApp(t)
@@ -40,10 +42,8 @@ func TestScrollbarInsideWindow(t *testing.T) {
 				bottom = info.Bounds.Y + info.Bounds.H
 			}
 		}
-		status := "ok"
 		if bottom > H {
-			status = "OVERFLOW"
+			t.Errorf("pct=%.0f: 滚动区底部 %.0f 超出窗口高度 %d", pct, bottom, H)
 		}
-		t.Logf("pct=%.0f scroll底部=%.0f (%s)", pct, bottom, status)
 	}
 }

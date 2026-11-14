@@ -433,28 +433,22 @@ func (a *App) outputPanel(c *ui.Context) {
 		if a.outputBusy {
 			sc.Y = math.MaxFloat32
 		}
-		// 逐行渲染，而不是把整段文本塞进一个 Text。
+		// 整段输出放进同一个 Text，不要一行一个 Text。
 		//
-		// 为什么：整段文本的高度由字体度量一次性算出，实测比
-		// 「行数 × 行高」小了一截（40 行只算出 576，少了约 46），
-		// 于是滚动上限也随之少算，滚到底仍有一段内容留在窗口外——
-		// 用户看到的正是最后一行只露出一半。
+		// 为什么：文字选区是按 Text 划分的，每行一个 Text 就把选区
+		// 切成了一行一块，鼠标拖选和 Ctrl+C 都跨不过行，批量复制失效。
+		// 同一个 Text 里可以任意跨行拖选。
 		//
-		// 每行一个 Text 后，内容高度就是各行之和，滚动上限自然准确。
+		// 内边距放在里面的 Column 上，而不是 Scroll 本身：Scroll 自己的
+		// Padding 会随内容一起滚动，底部那一截留白滚不进视口。
+		//
+		// 「滚到底最后一行被裁掉」的根因不在这里，而在最外层的左右分栏
+		// 高估了可用高度（见 view.go 的 Grow(1)）；分栏纠正后，单个 Text
+		// 的内容高度与滚动上限是一致的，不需要逐行渲染或末尾留白来凑。
 		ui.Scroll(c).Grow(1).Shrink(1).TrackScroll(sc).Children(func() {
-			ui.Column(c).FillWidth().Padding(8, 12).Gap(0).Children(func() {
-				for _, line := range splitLines(a.outputText) {
-					ui.Text(c, line).FontSize(12).Font("Consolas").
-						FixedLineHeight(outputLineHeight).
-						PreserveSpaces().Selectable()
-				}
-				// 末尾留三行高度的缓冲。
-				//
-				// Scroll 的滚动上限比「内容高 − 可视高」少了一点点
-				// （实测滚到底后最后一行仍差约 30~46 px 露在窗口外）。
-				// 加一块和行高相同的留白，让「滚到底」时最后一行
-				// 还能完整停在可视区内，而不是被裁掉半行。
-				ui.Spacer(c).Height(outputLineHeight * 3)
+			ui.Column(c).FillWidth().Padding(8, 12).Children(func() {
+				ui.Text(c, a.outputText).FontSize(12).Font("Consolas").
+					PreserveSpaces().Selectable()
 			})
 		})
 	})
@@ -472,26 +466,3 @@ func (a *App) confirm(title, body string, danger bool, action func()) {
 }
 
 var _ = fmt.Sprint
-
-// splitLines 把输出文本切成行，用于逐行渲染。
-//
-// 保留空行：日志里的空行是有意义的（分隔不同的操作阶段），
-// 丢掉会让内容看起来被合并。末尾的换行不额外生成空行。
-func splitLines(text string) []string {
-	if text == "" {
-		return nil
-	}
-	lines := strings.Split(text, "\n")
-	if n := len(lines); n > 0 && lines[n-1] == "" {
-		lines = lines[:n-1]
-	}
-	return lines
-}
-
-// outputLineHeight 是日志输出面板的固定行高（DIP）。
-//
-// 用固定值而不是字体自适应行高：自适应行高由字体度量决定
-// （实测每行约 14.05），与「行数 × 预期行高」对不上，
-// 导致滚动上限算小、滚到底仍有一截内容留在窗口外。
-// 固定行高让内容高度可预测，滚动上限才准确。
-const outputLineHeight float32 = 16
