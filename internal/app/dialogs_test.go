@@ -8,7 +8,12 @@ import (
 	"github.com/arno/wslc-manager/locales"
 )
 
-func TestTmpDialogsBuild(t *testing.T) {
+// TestDialogsBuild 验证三个对话框都能正常构建并显示关键控件。
+//
+// 为什么单独测：对话框走的是 ui.Modal，内容只在打开时构建；
+// 平时页面渲染根本不会碰到它们。一旦某个对话框里出现 nil 解引用
+// 或错用的控件 API，只有用户点开才会崩，测试却全绿。
+func TestDialogsBuild(t *testing.T) {
 	a := newTestApp(t)
 	a.settingsOpen = true
 	tt := ui.NewTester(a.View, 1180, 760)

@@ -33,12 +33,21 @@ jobs:
         shell: pwsh
         run: |
           # 列出未格式化的文件；有就失败。
-          $files = gofmt -l internal cmd main.go 2>$null
-          if ($files) {
+          #
+          # 注意：Windows 上若 core.autocrlf 把文件检出成 CRLF，
+          # gofmt 会把所有文件都报成未格式化。仓库根有 .gitattributes
+          # 强制 LF，这里再显式关掉换行转换，双重保证。
+          git config --global core.autocrlf false
+
+          $files = @(gofmt -l internal cmd main.go 2>$null)
+          if ($files.Count -gt 0) {
             Write-Host "以下文件未格式化：" -ForegroundColor Red
             $files | ForEach-Object { Write-Host "  $_" }
+            Write-Host "" 
+            Write-Host "本地执行 'gofmt -w internal cmd main.go' 修复。" -ForegroundColor Yellow
             exit 1
           }
+          Write-Host "所有 Go 文件格式正确" -ForegroundColor Green
 
       - name: go vet
         run: go vet ./...
