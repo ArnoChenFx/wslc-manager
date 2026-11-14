@@ -30,6 +30,8 @@ type Settings struct {
 	SidebarWidth float32 `json:"sidebarWidth"`
 	// ComposeListWidth 记住 Compose 详情里服务表那一侧的宽度。
 	ComposeListWidth float32 `json:"composeListWidth"`
+	// ComposeProjectsWidth 记住 Compose 页「项目列表」那一侧的宽度。
+	ComposeProjectsWidth float32 `json:"composeProjectsWidth"`
 	// Accent 是强调色标识（magenta / violet / blue / teal / amber / green）。
 	// 空表示用出厂默认。
 	Accent string `json:"accent"`

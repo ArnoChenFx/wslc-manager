@@ -29,7 +29,7 @@ func (a *App) imagesPage(c *ui.Context) {
 
 	// 表格与输出面板：有内容时上下分栏（可拖动），否则表格占满。
 	if a.outputOpen {
-		ui.SplitVertical(c, &a.outputHeight, func() {
+		ui.SplitVerticalPercent(c, &a.outputPercent, func() {
 			a.imageTable(c, rows)
 		}, func() {
 			a.outputPanel(c)

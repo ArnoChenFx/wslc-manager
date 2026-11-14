@@ -155,12 +155,21 @@ type App struct {
 	outputText  string
 	outputOpen  bool
 	outputBusy  bool
-	// outputHeight 是表格与输出面板之间分隔条的位置（上半栏高度）。
-	outputHeight float32
+	// outputPercent 是表格与输出面板之间分隔条的位置，
+	// 表示上半栏（表格）占可用高度的百分比（0-100）。
+	//
+	// 用百分比而不是像素：像素值在窗口变矮或用户拖到极限时会超出
+	// 可用高度，把日志面板整个推到窗口之外，滚动条也跟着滚到看不见的
+	// 区域（用户截图确认过）。百分比天然不会越界。
+	outputPercent float32
 
 	// composeListWidth 是 Compose 详情里「服务表 / 启动选项」之间
 	// 分隔条的宽度（服务表那一侧）。可拖动，并写入设置。
 	composeListWidth float32
+
+	// composeProjectsWidth 是「项目列表 / 项目详情」之间分隔条的宽度
+	// （项目列表那一侧）。可拖动，并写入设置。
+	composeProjectsWidth float32
 	// outputLines 是流式输出已收到的行数，用于状态提示。
 	outputLines int
 	// outputScroll 保存输出面板的滚动位置，配合 FollowEnd 让新行自动可见。
@@ -242,10 +251,11 @@ func New() *App {
 		serviceSel:   -1,
 	}
 	// 默认让表格占 58%，下面留给日志。
-	a.outputHeight = 380
+	a.outputPercent = 58
 	// 服务表与启动选项的默认分界：给选项栏留足宽度，
 	// 否则描述文字会逐词换行（"Equival / ent to / up -d"）。
 	a.composeListWidth = 400
+	a.composeProjectsWidth = 280
 	a.logFollow = true
 	return a
 }
@@ -261,6 +271,9 @@ func (a *App) Init() {
 		}
 		if s.ComposeListWidth > 0 {
 			a.composeListWidth = s.ComposeListWidth
+		}
+		if s.ComposeProjectsWidth > 0 {
+			a.composeProjectsWidth = s.ComposeProjectsWidth
 		}
 	} else {
 		a.settings = store.DefaultSettings()

@@ -39,7 +39,7 @@ func (a *App) containersPage(c *ui.Context) {
 	if a.outputOpen {
 		// 表格与输出面板用可拖动的上下分栏，和 Docker Desktop 一致：
 		// 用户能根据日志长短自己调比例。
-		ui.SplitVertical(c, &a.outputHeight, func() {
+		ui.SplitVerticalPercent(c, &a.outputPercent, func() {
 			a.containerTable(c, rows)
 		}, func() {
 			a.outputPanel(c)

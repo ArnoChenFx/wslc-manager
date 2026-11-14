@@ -34,16 +34,21 @@ func TestComposeSplitAndOptions(t *testing.T) {
 	tt := ui.NewTester(a.View, 1180, 760)
 	tt.Frame()
 
-	// 分隔条必须存在且可聚焦（Split 的分隔条 role 是 splitter）。
-	found := false
+	// Compose 页有两条需要能拖的分隔条：
+	//   1. 项目列表 / 项目详情
+	//   2. 服务表 / 启动选项
+	// 两条都曾经是静态 ui.Divider（用 Row + Divider 拼的），
+	// 用户完全调不了比例。这里逐条断言存在，防止又改回静态线。
+	var splitters []ui.Rect
 	for _, info := range tt.AccessAll() {
 		if info.Role == ui.RoleSplitter {
-			found = true
-			break
+			splitters = append(splitters, info.Bounds)
 		}
 	}
-	if !found {
-		t.Error("没有找到可拖动的分隔条（Split），仍是静态 Divider")
+	// 侧边栏那条也算在内，所以至少是 3 条。
+	if len(splitters) < 3 {
+		t.Errorf("可拖动分隔条只有 %d 条，期望至少 3 条"+
+			"（侧边栏、项目列表/详情、服务表/选项）", len(splitters))
 	}
 
 	// 选项栏的描述必须在窗口内，且宽度足够容纳一句英文

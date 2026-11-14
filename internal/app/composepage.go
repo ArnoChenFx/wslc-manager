@@ -24,20 +24,30 @@ func (a *App) composePage(c *ui.Context) {
 		// 主体：左侧项目列表 + 右侧详情。
 		// 有输出面板时上下分栏，让 up / build 等操作的进度可见可滚动。
 		body := func() {
-			ui.Row(c).Fill().AlignItems(ui.Stretch).Children(func() {
+			// 项目列表与详情之间用可拖动的分隔条。
+			//
+			// 之前这里是 Row + ui.Divider：一条静态线，列表宽度固定 280，
+			// 项目名长或窗口小时都调不了。ui.Split 让分隔条可拖动、
+			// 可用方向键微调、双击复位，并把位置写入设置。
+			split := ui.Split(c, &a.composeProjectsWidth, func() {
 				a.projectListPane(c)
-				ui.Divider(c)
+			}, func() {
 				// FillWidth 是必需的：少它时这个 Column 按内容自然宽度撑开，
 				// 于是表头那一行（名称 + 状态 + 四个按钮）把整体宽度推到
 				// 窗口之外，右侧操作区整个看不见（默认 1180 宽时实测复现）。
-				ui.Column(c).Grow(1).FillWidth().Shrink(1).Children(func() {
+				ui.Column(c).FillWidth().Shrink(1).FillHeight().Children(func() {
 					a.projectDetail(c)
 				})
-			})
+			}).Fill().SplitReset(280)
+
+			if split.Changed() {
+				a.settings.ComposeProjectsWidth = a.composeProjectsWidth
+				a.saveSettings()
+			}
 		}
 
 		if a.outputOpen {
-			ui.SplitVertical(c, &a.outputHeight, body, func() {
+			ui.SplitVerticalPercent(c, &a.outputPercent, body, func() {
 				a.outputPanel(c)
 			}).Grow(1)
 		} else {
@@ -50,7 +60,7 @@ func (a *App) composePage(c *ui.Context) {
 func (a *App) projectListPane(c *ui.Context) {
 	t := c.Theme()
 
-	ui.Column(c).Width(280).FillHeight().Children(func() {
+	ui.Column(c).FillHeight().FillWidth().Children(func() {
 		ui.Row(c).Padding(8, 10).Gap(6).AlignItems(ui.Center).Children(func() {
 			ui.Text(c, locales.ComposeProjects()).FontSize(12).Bold().TextColor(t.TextMuted).Grow(1)
 			if ui.Button(c, "").Label(locales.ComposeAdd()).Tooltip(locales.ComposeAddTooltip()).Children(func() {
