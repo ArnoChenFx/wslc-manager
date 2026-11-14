@@ -30,10 +30,13 @@ internal/compose  → 内置的 Compose 引擎：依赖 compose-go，经 Runtime
                     不 import internal/wslc，也不 import internal/app
 internal/store    → 只读写设置文件
 internal/selfupdate → 只封装 MyGo 的更新插件（注册、读状态、触发检查）
+internal/composert → 把 wslc.Client 适配成 compose.Runtime（图形界面与命令行共用）
+cmd/wslc-compose  → 命令行版 Compose：只依赖 compose / composert / wslc，
+                    **不 import internal/app，也不 import MyGo**
 ```
 
 - **内部包不允许反向依赖 `internal/app`。**
-- `internal/app/composert.go` 是唯一把 `wslc.Client` 适配成 `compose.Runtime` 的地方。
+- `internal/composert` 是唯一把 `wslc.Client` 适配成 `compose.Runtime` 的地方（图形界面与命令行共用）。
 - 视图层不做 IO。所有慢操作走 `runAsync` / 后台 goroutine，
   结果经 `Window.Update` 回主线程。
 
@@ -58,6 +61,24 @@ internal/selfupdate → 只封装 MyGo 的更新插件（注册、读状态、�
 - 清理半成品容器只能动「本次操作创建的」（`create-operation` 标签），绝不能按名字删。
 - 真实 wslc 测试（`realwslc_test.go`）只用本机已有的小镜像、唯一项目名，结束必清理；
   没有 wslc 或没有镜像时自动跳过。绝不碰用户已有的容器、网络、卷。
+- `Runtime.Attach`（子进程直接接到当前进程的标准流）只给命令行的 `exec` 用，图形界面不要调用：
+  它故意不隐藏控制台窗口，否则 `wslc exec -t` 拿不到可用的终端。
+- 所有能改动状态的操作都要支持 `ActionOptions.DryRun`，包括 `Exec`（dry-run 时只返回参数、绝不执行）。
+
+## 关于命令行工具
+
+`cmd/wslc-compose` 是同一个引擎的命令行版本，每次发布都会作为单独的 zip 带上。
+
+- 它必须是个小而独立的程序：不能 import `internal/app` 与 MyGo（`guard_test.go` 守着）。
+  `CGO_ENABLED=0` 拦不住这件事，因为 MyGo 本身不需要 cgo。
+- 全局选项（`-f`、`-p` ……）是根命令的**本地**选项，写在命令之前（`TraverseChildren`），
+  这样子命令才能有自己的 `-f`（`logs -f` 是「跟随」）。不要改成持久（persistent）选项，简写会冲突。
+- 输出分流：进度写 stderr，`ps` / `config` / `logs` 这类数据写 stdout；`--dry-run` 的预览写 stdout。
+- 退出码：0 成功，1 运行失败，2 用法错误，130 被 Ctrl+C 打断，`exec` 是容器内命令的退出码。
+- 找 wslc 是惰性的（`runtime.go`）：`config`、`--version` 在没装 wslc 的机器上也要能用。
+- 版本号用 `-ldflags "-X main.version=…"` 注入；链接器对不存在的符号静默忽略，
+  所以 `internal/selfupdate/release_test.go` 会校验变量名没写错。
+- 发布流程里的构建、打包、校验和、上传，以及 CI 里的冒烟步骤，都有契约测试守着。
 
 ## 测试要求
 
@@ -70,6 +91,7 @@ internal/selfupdate → 只封装 MyGo 的更新插件（注册、读状态、�
 | 视图布局/文案 | `ui.NewTester` + `Access`/`Find` 量几何 |
 | 编排流程（up/down/重建/依赖等待/失败不连坐） | 假 `Runtime` 记录命令并断言 |
 | 与真实 wslc 的契约 | 集成测试（`realwslc_test.go`），未安装时 `t.Skip` |
+| 命令行（选项映射、输出流、退出码） | 假引擎（`cmd/wslc-compose/cli_test.go`）；`config` 这类不需要 wslc 的命令用真实引擎 + 一旦被调用就失败的 `Runtime` |
 | 更新配置 / 发布流程（`mygo.json`、`release.yml`） | 契约测试：解析文件断言约定，见 `internal/selfupdate/release_test.go` |
 | 崩溃/死锁类修复 | 必须补回归测试，注释写明崩溃现象 |
 

@@ -8,14 +8,18 @@ name: Release
 #      the installer name both take it from there).
 #   3. mygo build produces the portable executable, the NSIS installer and,
 #      signed with the key, the update archive and its manifest.
-#   4. Verify the update files, then zip and checksum.
-#   5. Upload everything to a draft release of that tag, then publish it.
+#   4. Build the wslc-compose command-line tool: a second, separate binary.
+#   5. Verify the update files, then zip and checksum.
+#   6. Upload everything to a draft release of that tag, then publish it.
 #
 # Installed apps read update-windows-amd64.json from the latest release
 # (releases/latest/download/) and download the archive it names. The
 # manifest and the archive are therefore part of every release, never
 # optional: a release without them is one that no installed app can
 # update to.
+#
+# The command-line tool is a plain download next to them: it is not part of
+# the update archive, and the app does not update it.
 on:
   push:
     tags:
@@ -112,6 +116,38 @@ jobs:
           MYGO_UPDATER_PRIVATE_KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
         run: go tool mygo build -platform windows/amd64
 
+      # The wslc-compose command-line tool is a second, separate binary built
+      # from the same source and published with every release. It is pure Go:
+      # no cgo, and none of the GUI toolkit. CGO_ENABLED=0 enforces the first
+      # part here; the second is enforced by cmd/wslc-compose/guard_test.go,
+      # which "Test before publishing" runs. Its version comes from the tag,
+      # like the app's.
+      - name: Build the command-line tool
+        id: cli
+        shell: pwsh
+        env:
+          CGO_ENABLED: "0"
+          GOOS: windows
+          GOARCH: amd64
+        run: |
+          $ver = "${{ steps.version.outputs.version }}"
+          $dir = "build/cli"
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+
+          go build -trimpath -ldflags "-s -w -X main.version=$ver" -o "$dir/wslc-compose.exe" ./cmd/wslc-compose
+          if ($LASTEXITCODE -ne 0) { throw "go build failed" }
+
+          # Run the exact file we are about to publish: it must start, and it
+          # must report this tag's version rather than "dev".
+          $reported = (& "$dir/wslc-compose.exe" --version) -join "`n"
+          if ($LASTEXITCODE -ne 0) { throw "wslc-compose --version failed" }
+          Write-Host $reported
+          if ($reported -notlike "wslc-compose $ver *") {
+            throw "The binary reports '$reported', expected it to start with 'wslc-compose $ver '"
+          }
+
+          "exe=$dir/wslc-compose.exe" >> $env:GITHUB_OUTPUT
+
       # Check what installed apps will look for, and that it belongs to this
       # tag: the app downloads the archive from the URL inside the manifest,
       # so the file uploaded must have exactly the name that URL ends with.
@@ -167,6 +203,15 @@ jobs:
           Copy-Item "LICENSE" stage/ -ErrorAction SilentlyContinue
           Compress-Archive -Path "stage/*" -DestinationPath $zip -Force
 
+          # The command-line tool: the executable plus the licence and docs.
+          $cliZip = "wslc-compose-$ver-windows-amd64.zip"
+          New-Item -ItemType Directory -Force -Path stage-cli | Out-Null
+          Copy-Item "${{ steps.cli.outputs.exe }}" stage-cli/
+          Copy-Item "README.md" stage-cli/
+          Copy-Item "README-zh.md" stage-cli/
+          Copy-Item "LICENSE" stage-cli/ -ErrorAction SilentlyContinue
+          Compress-Archive -Path "stage-cli/*" -DestinationPath $cliZip -Force
+
           # The installer comes from mygo build; rename it to a stable,
           # versioned name.
           $setup = Get-ChildItem "$out/*setup*.exe" | Select-Object -First 1
@@ -176,11 +221,12 @@ jobs:
 
           "zip=$zip" >> $env:GITHUB_OUTPUT
           "setup=$setupName" >> $env:GITHUB_OUTPUT
+          "cli_zip=$cliZip" >> $env:GITHUB_OUTPUT
 
       - name: Checksums
         shell: pwsh
         run: |
-          $files = @("${{ steps.package.outputs.zip }}", "${{ steps.package.outputs.setup }}")
+          $files = @("${{ steps.package.outputs.zip }}", "${{ steps.package.outputs.setup }}", "${{ steps.package.outputs.cli_zip }}")
           $lines = foreach ($f in $files) {
             $hash = (Get-FileHash $f -Algorithm SHA256).Hash.ToLower()
             "$hash  $f"
@@ -203,6 +249,7 @@ jobs:
           files: |
             ${{ steps.package.outputs.zip }}
             ${{ steps.package.outputs.setup }}
+            ${{ steps.package.outputs.cli_zip }}
             SHA256SUMS.txt
             ${{ steps.update.outputs.archive }}
             ${{ steps.update.outputs.manifest }}
@@ -215,6 +262,7 @@ jobs:
             **Downloads**
             - `${{ steps.package.outputs.setup }}` — installer (recommended)
             - `${{ steps.package.outputs.zip }}` — portable, extract and run
+            - `${{ steps.package.outputs.cli_zip }}` — the `wslc-compose` command-line tool, for terminals and scripts
             - `SHA256SUMS.txt` — verify your download
 
             **Requirements**
@@ -222,11 +270,15 @@ jobs:
 
             It is checked on the **System** page, which can install or update WSL for you. Compose is built in.
 
+            **Command-line tool**
+            `wslc-compose.exe` runs the same Compose engine the app uses, from any terminal: `up`, `down`, `ps`, `logs`, `exec` and more. It needs only `wslc`. Extract it anywhere on your `PATH` and run `wslc-compose --help`. The app does not update it; download a newer zip to upgrade.
+
             **Highlights**
             - Containers: start, stop, restart, remove, live stats and streaming logs
             - Images: pull with live progress, browse tags, update one or all
             - Volumes and networks: create, inspect, delete
             - Compose projects: built-in orchestration (start, stop, rebuild, dependency waits, dry-run preview)
+            - `wslc-compose` command-line tool with the same engine, as a separate download
             - Chinese and English UI, switchable in Settings
             - Six accent colors
             - Diagnostic reports with versions, element coordinates and recent logs

@@ -36,6 +36,8 @@
 
 `wslc` 做不到的设置（`privileged`、`devices`、`sysctls`、`always` / `no` 之外的重启策略等）会给出警告并被忽略；会悄悄出错的用法（匿名卷、外部或非文件来源的 secret、IPv6 网络）会在创建任何东西之前被拒绝。
 
+同一个引擎也提供独立的[命令行工具](#命令行工具)。
+
 ### 系统
 环境版本、WSL 会话，以及在缺少 `wslc` 时可一键安装或更新 WSL 的体检。
 
@@ -73,12 +75,36 @@
 
 下载并运行 `wslc-manager-setup-<版本>-amd64.exe`，会安装应用并创建开始菜单项。
 
+### 命令行工具
+
+Compose 引擎也有独立的 `wslc-compose` 命令行版本，方便在终端和脚本里使用。从 [Releases](https://github.com/ArnoChenFx/wslc-manager/releases) 下载 `wslc-compose-<版本>-windows-amd64.zip`，把里面的 `wslc-compose.exe` 解压到 `PATH` 里的任意目录，在含有 `compose.yaml` 的目录里运行：
+
+```powershell
+wslc-compose up -d          # 创建并启动服务
+wslc-compose ps             # 查看容器
+wslc-compose logs -f web    # 跟随某个服务的日志
+wslc-compose exec web sh    # 在容器里开一个 shell
+wslc-compose down           # 停止并移除
+```
+
+命令：`up`、`down`、`start`、`stop`、`restart`、`ps`、`logs`、`exec`、`pull`、`build`、`config`、`version`。每个命令的选项用 `wslc-compose <命令> --help` 查看。
+
+作用于整个项目的选项要写在命令**之前**：`-f/--file`（可重复）、`-p/--project-name`、`--env-file`、`--profile`，以及 `--dry-run`（只打印将要执行的 `wslc` 命令，不真正执行）。
+
+```powershell
+wslc-compose -f compose.yaml -f override.yaml -p demo up -d
+wslc-compose --dry-run up -d
+```
+
+它和应用管理的是同一批项目（两边用同一个引擎，给容器打同样的标签），只依赖 `wslc`。进度信息写到标准错误；`ps`、`config`、`logs` 写到标准输出，可以直接接管道。退出码：成功 `0`，失败 `1`，用法错误 `2`；`exec` 则是容器内命令自己的退出码。应用不会更新命令行工具，升级时下载新的 zip 即可。
+
 ### 从源码构建
 
 ```powershell
 git clone https://github.com/ArnoChenFx/wslc-manager.git
 cd wslc-manager
 go build -o "WSLC Manager.exe" .
+go build -o wslc-compose.exe ./cmd/wslc-compose   # 命令行工具
 ```
 
 需要 Go 1.25 或更高版本。
@@ -112,6 +138,7 @@ go build -o "WSLC Manager.exe" .
 - **[Go](https://go.dev)** —— 单一静态二进制，目标机器无需安装运行时。
 - **[MyGo](https://github.com/egoist/mygo)** —— 纯 Go 的原生桌面 UI。布局、主题、控件、系统原生文件对话框、平台窗口都由它提供。没有 HTML，没有 JavaScript，不打包浏览器。
 - **[compose-go](https://github.com/compose-spec/compose-go)** —— 读取并规范化 Compose 文件（`docker compose` 背后的库）。其上的 `wslc` 编排是本仓库自己的 `internal/compose` 包。
+- **[cobra](https://github.com/spf13/cobra)** —— `wslc-compose` 命令行工具的参数解析。
 
 ---
 

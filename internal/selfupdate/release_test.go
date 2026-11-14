@@ -221,3 +221,110 @@ func TestReleaseVerifyStepChecksWhatAppsNeed(t *testing.T) {
 		}
 	}
 }
+
+// loadJobSteps 解析指定工作流文件里指定 job 的步骤。
+func loadJobSteps(t *testing.T, file, job string) []workflowStep {
+	t.Helper()
+	var wf struct {
+		Jobs map[string]struct {
+			Steps []workflowStep `yaml:"steps"`
+		} `yaml:"jobs"`
+	}
+	if err := yaml.Unmarshal(readRepoFile(t, ".github", "workflows", file), &wf); err != nil {
+		t.Fatalf("%s 不是合法 YAML: %v", file, err)
+	}
+	j, ok := wf.Jobs[job]
+	if !ok {
+		t.Fatalf("%s 里找不到 job %q", file, job)
+	}
+	return j.Steps
+}
+
+// TestReleaseWorkflowPublishesTheCommandLineTool 验证发布流程会构建、打包并上传 wslc-compose 命令行工具。
+//
+// 防的是这几种「发布成功，但没有命令行工具（或者发出去的是个错的）」：
+//   - 构建步骤被删、排错了位置，或者忘了开 CGO_ENABLED=0；
+//   - ldflags 里的变量名和 cmd/wslc-compose 里的对不上：链接器对不存在的符号静默忽略，
+//     发出去的程序会一直自称 dev，而且没有任何报错；
+//   - 打了包，但没写进上传列表或校验和，用户在发布页上根本看不到它。
+func TestReleaseWorkflowPublishesTheCommandLineTool(t *testing.T) {
+	steps := loadReleaseSteps(t)
+
+	version := stepIndex(t, steps, "从 tag 取版本号", func(s workflowStep) bool { return s.ID == "version" })
+	build := stepIndex(t, steps, "mygo build", func(s workflowStep) bool { return strings.Contains(s.Run, "mygo build") })
+	cli := stepIndex(t, steps, "构建命令行工具", func(s workflowStep) bool { return s.ID == "cli" })
+	pack := stepIndex(t, steps, "打包", func(s workflowStep) bool { return s.ID == "package" })
+	sums := stepIndex(t, steps, "生成校验和", func(s workflowStep) bool {
+		return strings.Contains(s.Run, "SHA256SUMS.txt") && strings.Contains(s.Run, "Get-FileHash")
+	})
+	release := stepIndex(t, steps, "创建发布", func(s workflowStep) bool {
+		return strings.HasPrefix(s.Uses, "softprops/action-gh-release")
+	})
+
+	// 先有版本号才能注入；先于打包；打包先于校验和与上传。
+	order := []struct {
+		name string
+		idx  int
+	}{{"取版本号", version}, {"构建命令行工具", cli}, {"打包", pack}, {"校验和", sums}, {"创建发布", release}}
+	for i := 1; i < len(order); i++ {
+		if order[i-1].idx >= order[i].idx {
+			t.Errorf("步骤顺序不对：「%s」应排在「%s」之前", order[i-1].name, order[i].name)
+		}
+	}
+	_ = build // mygo build 与命令行构建互不依赖，顺序不做要求
+
+	// 构建：纯 Go（不要 cgo）、可复现、版本号来自 tag。
+	c := steps[cli]
+	if c.Env["CGO_ENABLED"] != "0" {
+		t.Errorf("命令行必须用 CGO_ENABLED=0 构建，env 里是 %q", c.Env["CGO_ENABLED"])
+	}
+	for _, want := range []string{
+		"./cmd/wslc-compose",
+		"-trimpath",
+		"-X main.version=$ver",
+		"${{ steps.version.outputs.version }}", // $ver 来自 tag，而不是写死
+		"--version",                            // 构建完要真的跑一下，确认能启动并且版本对
+		"exe=",                                 // 把产物路径交给后面的打包步骤
+	} {
+		if !strings.Contains(c.Run, want) {
+			t.Errorf("命令行的构建步骤里缺少 %q：\n%s", want, c.Run)
+		}
+	}
+	// 链接器的 -X 对不存在的符号静默忽略，所以要确认 main.version 真的存在。
+	mainGo := string(readRepoFile(t, "cmd", "wslc-compose", "main.go"))
+	if !regexp.MustCompile(`(?m)^var version = "dev"$`).MatchString(mainGo) {
+		t.Error(`cmd/wslc-compose/main.go 里应有 var version = "dev"，否则 -X main.version=… 什么也不会改`)
+	}
+
+	// 打包、校验和、上传：三处都要有它。
+	if !strings.Contains(steps[pack].Run, "wslc-compose-$ver-windows-amd64.zip") || !strings.Contains(steps[pack].Run, "cli_zip=") {
+		t.Errorf("打包步骤应生成 wslc-compose-$ver-windows-amd64.zip 并写出 cli_zip：\n%s", steps[pack].Run)
+	}
+	files, _ := steps[release].With["files"].(string)
+	for where, text := range map[string]string{"校验和": steps[sums].Run, "上传列表": files} {
+		if !strings.Contains(text, "steps.package.outputs.cli_zip") {
+			t.Errorf("%s里缺少命令行工具的压缩包（steps.package.outputs.cli_zip）", where)
+		}
+	}
+}
+
+// TestCIBuildsTheCommandLineTool 验证 CI 会单独构建并启动命令行工具。
+//
+// 命令行工具每次发布都会带上，而 `go build ./...` 只能证明它「能编译」，
+// 证明不了它「是个能独立启动、不需要 cgo 的程序」——那要等到打 tag 才暴露。
+// 所以 CI 里要有一步用 CGO_ENABLED=0 真的构建并运行它；这个测试防止那一步被删掉。
+func TestCIBuildsTheCommandLineTool(t *testing.T) {
+	steps := loadJobSteps(t, "ci.yml", "test")
+	i := stepIndex(t, steps, "构建并启动命令行工具", func(s workflowStep) bool {
+		return strings.Contains(s.Run, "./cmd/wslc-compose")
+	})
+	s := steps[i]
+	if s.Env["CGO_ENABLED"] != "0" {
+		t.Errorf("CI 里必须用 CGO_ENABLED=0 构建命令行，env 里是 %q", s.Env["CGO_ENABLED"])
+	}
+	for _, want := range []string{"--version", " config"} {
+		if !strings.Contains(s.Run, want) {
+			t.Errorf("CI 的命令行步骤应当真的运行它（缺少 %q）：\n%s", want, s.Run)
+		}
+	}
+}

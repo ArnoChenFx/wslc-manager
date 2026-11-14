@@ -36,6 +36,8 @@ Supported: `up` / `down` / `start` / `stop` / `restart` / `pull` / `build`, `dep
 
 Settings that `wslc` cannot honour (`privileged`, `devices`, `sysctls`, restart policies other than `always` / `no`, …) are reported as warnings and ignored; usages that would silently misbehave (anonymous volumes, external or non-file secrets, IPv6 networks) are rejected before anything is created.
 
+The same engine is also available as a standalone [command-line tool](#command-line-tool).
+
 ### System
 Environment versions, WSL sessions, and a one-click check that can install or update WSL when `wslc` is missing.
 
@@ -73,12 +75,36 @@ Download `WSLC-Manager-<version>-windows-amd64.zip` from [Releases](https://gith
 
 Download and run `wslc-manager-setup-<version>-amd64.exe`. It installs the app and creates a Start Menu entry.
 
+### Command-line tool
+
+The Compose engine is also available as a standalone `wslc-compose` command, for terminals and scripts. Download `wslc-compose-<version>-windows-amd64.zip` from [Releases](https://github.com/ArnoChenFx/wslc-manager/releases), extract `wslc-compose.exe` somewhere on your `PATH`, and run it in a directory that has a `compose.yaml`:
+
+```powershell
+wslc-compose up -d          # create and start the services
+wslc-compose ps             # list the containers
+wslc-compose logs -f web    # follow one service's logs
+wslc-compose exec web sh    # open a shell in a container
+wslc-compose down           # stop and remove everything
+```
+
+Commands: `up`, `down`, `start`, `stop`, `restart`, `ps`, `logs`, `exec`, `pull`, `build`, `config`, `version`. Run `wslc-compose <command> --help` for each one's options.
+
+Options that apply to the whole project go **before** the command: `-f/--file` (repeatable), `-p/--project-name`, `--env-file`, `--profile`, and `--dry-run`, which prints the `wslc` commands instead of running them.
+
+```powershell
+wslc-compose -f compose.yaml -f override.yaml -p demo up -d
+wslc-compose --dry-run up -d
+```
+
+It manages the same projects as the app (both use one engine and label their containers the same way) and needs only `wslc`. Progress goes to standard error; `ps`, `config` and `logs` write to standard output, so they pipe cleanly. The exit status is `0` on success, `1` on failure, `2` for a usage error, and for `exec` the status of the command itself. The app does not update the command-line tool: download a newer zip to upgrade it.
+
 ### From source
 
 ```powershell
 git clone https://github.com/ArnoChenFx/wslc-manager.git
 cd wslc-manager
 go build -o "WSLC Manager.exe" .
+go build -o wslc-compose.exe ./cmd/wslc-compose   # the command-line tool
 ```
 
 Requires Go 1.25 or newer.
@@ -112,6 +138,7 @@ If something is missing, the **System** page tells you which dependency is absen
 - **[Go](https://go.dev)** — single static binary, no runtime to install.
 - **[MyGo](https://github.com/egoist/mygo)** — native desktop UI in pure Go. Layout, theming, widgets, native file dialogs and the platform window are all provided by it. No HTML, no JavaScript, no bundled browser.
 - **[compose-go](https://github.com/compose-spec/compose-go)** — reads and normalises Compose files (the library behind `docker compose`). The `wslc` orchestration on top of it is this repository's own `internal/compose` package.
+- **[cobra](https://github.com/spf13/cobra)** — command-line parsing for the `wslc-compose` tool.
 
 ---
 

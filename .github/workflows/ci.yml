@@ -69,6 +69,31 @@ jobs:
       - name: Build
         run: go build ./...
 
+      # The wslc-compose command-line tool is published with every release, so
+      # check here that it builds on its own (no cgo) and starts. `config`
+      # needs no wslc, so this also works on a runner that has none. (That it
+      # does not link the GUI toolkit is checked by a Go test.)
+      - name: Command-line tool
+        shell: pwsh
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          $exe = Join-Path $env:RUNNER_TEMP "wslc-compose.exe"
+          go build -trimpath -o $exe ./cmd/wslc-compose
+          if ($LASTEXITCODE -ne 0) { throw "go build failed" }
+          & $exe --version
+          if ($LASTEXITCODE -ne 0) { throw "wslc-compose --version failed" }
+
+          $dir = Join-Path $env:RUNNER_TEMP "cli-smoke"
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          Set-Content -Path (Join-Path $dir "compose.yaml") -Value "services:`n  web:`n    image: nginx:alpine`n"
+          Push-Location $dir
+          try { $out = (& $exe config) -join "`n" } finally { Pop-Location }
+          if ($LASTEXITCODE -ne 0 -or $out -notmatch "image: nginx:alpine") {
+            throw "wslc-compose config did not print the service:`n$out"
+          }
+          Write-Host "wslc-compose works: config printed the service"
+
   # Keeps the catalogs and the source in sync: every string used in code
   # must have an English translation, and the generated accessors must
   # match the catalogs.
