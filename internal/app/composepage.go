@@ -27,7 +27,10 @@ func (a *App) composePage(c *ui.Context) {
 			ui.Row(c).Fill().AlignItems(ui.Stretch).Children(func() {
 				a.projectListPane(c)
 				ui.Divider(c)
-				ui.Column(c).Grow(1).Children(func() {
+				// FillWidth 是必需的：少它时这个 Column 按内容自然宽度撑开，
+				// 于是表头那一行（名称 + 状态 + 四个按钮）把整体宽度推到
+				// 窗口之外，右侧操作区整个看不见（默认 1180 宽时实测复现）。
+				ui.Column(c).Grow(1).FillWidth().Shrink(1).Children(func() {
 					a.projectDetail(c)
 				})
 			})
@@ -191,18 +194,25 @@ func (a *App) projectDetail(c *ui.Context) {
 		return
 	}
 
-	ui.Column(c).Fill().Children(func() {
+	ui.Column(c).Fill().FillWidth().Children(func() {
 		// 项目头部
 		a.projectHeader(c, *p)
 		ui.Divider(c)
 
 		// 主体：服务列表 + 选项
-		ui.Row(c).Grow(1).AlignItems(ui.Stretch).Children(func() {
-			ui.Column(c).Grow(1).FillHeight().Children(func() {
+		//
+		// 两栏都必须能在空间不足时让位：
+		// 服务表 5 列的自然宽度合计约 710，选项栏固定 260，
+		// 加起来超过默认窗口（1180）里右栏可用的约 670，
+		// 结果整个「启动选项」被推到窗口之外（实测 x=1225）。
+		//
+		// Grow + Shrink 让表格按剩余空间收缩，选项栏给一个更窄的基准宽度。
+		ui.Row(c).Grow(1).FillWidth().AlignItems(ui.Stretch).Children(func() {
+			ui.Column(c).Grow(1).Shrink(1).FillHeight().MinWidth(240).Children(func() {
 				a.serviceTable(c, *p)
 			})
 			ui.Divider(c)
-			ui.Column(c).Width(260).FillHeight().Children(func() {
+			ui.Column(c).Width(210).MinWidth(180).Shrink(1).FillHeight().Children(func() {
 				a.projectOptions(c, *p)
 			})
 		})
@@ -210,103 +220,157 @@ func (a *App) projectDetail(c *ui.Context) {
 }
 
 // projectHeader 绘制项目标题与主要动作。
+//
+// 布局刻意分成两行（标题行 / 操作行）而不是挤在一行：
+// 详情区在默认窗口（1180）下只有约 678 宽，而
+// 「名称 + 路径 + 状态徽章 + 启动 + 停止 + 重启 + 更多」
+// 排成一行时需求约 750，右侧按钮会被直接推到窗口之外
+// （实测「启动」x=1150 只剩几十像素，后两个按钮宽度为 0，
+// 整个操作区看不见）。拆成两行后，无论窗口多窄都不会溢出，
+// 加按钮也不必再斤斤计较宽度。
 func (a *App) projectHeader(c *ui.Context, p compose.Project) {
 	t := c.Theme()
 
-	ui.Column(c).Padding(10, 12).Gap(6).Children(func() {
+	ui.Column(c).FillWidth().Shrink(1).Padding(10, 12).Gap(8).Children(func() {
+		// ── 标题行：名称 + 状态 ──────────────────────
 		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
-			ui.Text(c, p.Name).FontSize(16).Bold().Selectable()
-			ui.Text(c, baseName(p.Dir)).FontSize(11).TextColor(t.TextMuted).Selectable().Tooltip(p.Dir)
-			ui.Spacer(c)
+			ui.Text(c, p.Name).FontSize(16).Bold().SingleLine().Shrink(1).
+				Selectable().Tooltip(p.Name)
 
-			// 该目录上是否有编排动作正在跑（用于禁用重复点击 + 显示转圈）。
-			running := a.composeBusy(p.Dir)
-
-			// 启动
-			upBtn := ui.PrimaryButton(c, locales.ComposeStart()).Tooltip("wslc-compose up").Disabled(running)
-			if running {
-				// 操作进行中：用转圈图标替代文字，让用户看到它在跑。
-				upBtn.Children(func() {
-					sp := ui.Spinner(c).Size(12, 12).Label(locales.ComposeExecuting())
-					_ = sp
-					ui.Text(c, locales.ComposeExecutingEllipsis())
-				})
+			if rt := a.projectRuntimeOf(p); rt.Total > 0 {
+				color := t.TextMuted
+				label := locales.ComposePartialRunning(rt.Running, rt.Total)
+				if rt.All() {
+					color = t.Success
+				}
+				ui.Badge(c, label).TextColor(color)
 			}
-			if !running && upBtn.Clicked() {
-				a.composeAction(p, compose.ActionUp, locales.ComposeStarted(p.Name))
-			}
-			// 停止
-			if ui.Button(c, locales.ComposeStop()).Tooltip("wslc-compose stop").Disabled(running).Clicked() && !running {
-				a.composeAction(p, compose.ActionStop, locales.ComposeStopped(p.Name))
-			}
-			// 重启
-			if ui.Button(c, locales.ComposeRestart()).Tooltip("wslc-compose restart").Disabled(running).Clicked() && !running {
-				a.composeAction(p, compose.ActionRestart, locales.ComposeRestarted(p.Name))
-			}
-			// 移除（down）
-			down := ui.Button(c, locales.ComposeDown()).Tooltip("wslc-compose down")
-			down.TextColor(t.Danger)
-			if down.Clicked() {
-				name, dir := p.Name, p.Dir
-				vols := a.downVolumes
-				volSuffix := ""
-				if vols {
-					volSuffix = locales.ComposeRemoveWithVolumes()
-				}
-				a.confirm(locales.ComposeRemoveContainers(), locales.ComposeRemoveConfirm(name, volSuffix), vols, func() {
-					a.composeRun(dir, compose.ActionDown, compose.ActionOptions{Volumes: vols}, locales.ComposeRemoved(name))
-				})
-			}
-
-			// 更多操作：用 MyGo 在窗口内绘制的菜单按钮，跨平台一致。
-			more := ui.Button(c, "").Label(locales.CommonMore()).Tooltip(locales.CommonMoreActions())
-			more.Children(func() { ui.Icon(c, icon("settings")).FontSize(14) })
-			more.PopoverMenuButton(func(m *ui.Menu) {
-				if m.Item(locales.ImagesPullTitle()).Chosen() {
-					a.composeAction(p, compose.ActionPull, locales.ComposePulled(p.Name))
-				}
-				if m.Item(locales.ComposeBuildImage()).Chosen() {
-					a.composeAction(p, compose.ActionBuild, locales.ComposeBuilt(p.Name))
-				}
-				m.Separator()
-				if m.Item(locales.ContainersShowStats()).Chosen() {
-					a.composePS(p)
-				}
-				if m.Item(locales.ComposePreviewUp()).Chosen() {
-					a.composeDryRun(p)
-				}
-				m.Separator()
-				if m.Item(locales.CommonOpenInExplorer()).Chosen() {
-					a.openInExplorer(p.Dir)
-				}
-				if m.Item(locales.ComposeRemoveFromList()).Chosen() {
-					a.RemoveProject(p.Dir)
-				}
-			})
 		})
 
-		// 文件与环境信息
+		// ── 操作行：按钮 ─────────────────────────────
+		busy := a.composeBusy(p.Dir)
+		state := a.projectRuntimeOf(p)
+		a.projectActions(c, p, busy, state)
+
+		// ── 文件信息行 ───────────────────────────────
 		ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {
 			files := p.Config.ComposeFiles
 			if len(files) > 0 {
-				ui.Text(c, locales.ComposeFiles(joinNames(files))).FontSize(11).TextColor(t.TextMuted).Selectable().
+				ui.Text(c, locales.ComposeFiles(joinNames(files))).FontSize(11).
+					TextColor(t.TextMuted).SingleLine().Shrink(1).Selectable().
 					Tooltip(strings.Join(files, "\n"))
 			}
 			if p.Config.EnvFile != nil && *p.Config.EnvFile != "" {
-				ui.Text(c, "env: "+baseName(*p.Config.EnvFile)).FontSize(11).TextColor(t.TextMuted).Selectable().
+				ui.Text(c, "env: "+baseName(*p.Config.EnvFile)).FontSize(11).
+					TextColor(t.TextMuted).SingleLine().Shrink(1).Selectable().
 					Tooltip(*p.Config.EnvFile)
 			}
 		})
 	})
 }
 
-// joinNames 把文件路径列表渲染成短名字。
-func joinNames(files []string) string {
-	names := make([]string, 0, len(files))
-	for _, f := range files {
-		names = append(names, baseName(f))
-	}
-	return strings.Join(names, ", ")
+// projectActions 绘制项目的操作按钮行。
+//
+// 按钮可用性由项目实际状态决定，而不是只看「有没有动作在跑」：
+//   - 已全部运行：启动不可用（点了无事发生）
+//   - 完全没在跑：停止/重启不可用
+//   - 没有容器：移除不可用
+//
+// 这样按钮「灰掉」本身就是信息，用户不必点一次才知道。
+func (a *App) projectActions(c *ui.Context, p compose.Project, busy bool, state projectRuntime) {
+	t := c.Theme()
+
+	ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+		// 启动
+		upBtn := ui.PrimaryButton(c, locales.ComposeStart()).
+			Tooltip(locales.ComposeStartTooltip()).
+			Disabled(busy || state.All())
+		switch {
+		case state.All():
+			upBtn.Tooltip(locales.ComposeAlreadyRunning())
+		case busy:
+			upBtn.Children(func() {
+				ui.Spinner(c).Size(12, 12).Label(locales.ComposeExecuting())
+				ui.Text(c, locales.ComposeExecutingEllipsis())
+			})
+		}
+		if !busy && !state.All() && upBtn.Clicked() {
+			a.composeAction(p, compose.ActionUp, locales.ComposeStarted(p.Name))
+		}
+
+		// 停止
+		stopBtn := ui.Button(c, locales.ComposeStop()).
+			Tooltip(locales.ComposeStopTooltip()).
+			Disabled(busy || state.None())
+		if state.None() {
+			stopBtn.Tooltip(locales.ComposeNotRunning())
+		}
+		if stopBtn.Clicked() && !busy && !state.None() {
+			a.composeAction(p, compose.ActionStop, locales.ComposeStopped(p.Name))
+		}
+
+		// 重启
+		restartBtn := ui.Button(c, locales.ComposeRestart()).
+			Tooltip(locales.ComposeRestartTooltip()).
+			Disabled(busy || state.None())
+		if state.None() {
+			restartBtn.Tooltip(locales.ComposeNotRunning())
+		}
+		if restartBtn.Clicked() && !busy && !state.None() {
+			a.composeAction(p, compose.ActionRestart, locales.ComposeRestarted(p.Name))
+		}
+
+		vSep(c)
+
+		// 移除（down）：危险且低频，但仍放主行——两行布局后空间够用。
+		down := ui.Button(c, locales.ComposeDown()).
+			Tooltip(locales.ComposeDownTooltip()).
+			Disabled(busy || state.Total == 0)
+		down.TextColor(t.Danger)
+		if state.Total == 0 {
+			down.Tooltip(locales.ComposeNothingToRemove())
+		}
+		if down.Clicked() && !busy && state.Total > 0 {
+			name, dir := p.Name, p.Dir
+			vols := a.downVolumes
+			volSuffix := ""
+			if vols {
+				volSuffix = locales.ComposeRemoveWithVolumes()
+			}
+			a.confirm(locales.ComposeRemoveContainers(),
+				locales.ComposeRemoveConfirm(name, volSuffix), vols, func() {
+					a.composeRun(dir, compose.ActionDown,
+						compose.ActionOptions{Volumes: vols},
+						locales.ComposeRemoved(name))
+				})
+		}
+
+		// 更多
+		more := ui.Button(c, "").Label(locales.CommonMore()).Tooltip(locales.CommonMoreActions())
+		more.Children(func() { ui.Icon(c, icon("settings")).FontSize(14) })
+		more.PopoverMenuButton(func(m *ui.Menu) {
+			if m.Item(locales.ImagesPullTitle()).Chosen() {
+				a.composeAction(p, compose.ActionPull, locales.ComposePulled(p.Name))
+			}
+			if m.Item(locales.ComposeBuildImage()).Chosen() {
+				a.composeAction(p, compose.ActionBuild, locales.ComposeBuilt(p.Name))
+			}
+			m.Separator()
+			if m.Item(locales.ContainersShowStats()).Chosen() {
+				a.composePS(p)
+			}
+			if m.Item(locales.ComposePreviewUp()).Chosen() {
+				a.composeDryRun(p)
+			}
+			m.Separator()
+			if m.Item(locales.CommonOpenInExplorer()).Chosen() {
+				a.openInExplorer(p.Dir)
+			}
+			if m.Item(locales.ComposeRemoveFromList()).Chosen() {
+				a.RemoveProject(p.Dir)
+			}
+		})
+	})
 }
 
 // serviceTable 绘制项目中的服务定义。
@@ -321,11 +385,14 @@ func (a *App) serviceTable(c *ui.Context, p compose.Project) {
 	}
 
 	cols := []ui.TableColumn{
-		{Title: locales.ComposeServices(), Width: 160, MinWidth: 90},
-		{Title: locales.ContainersImage(), MinWidth: 180},
-		{Title: locales.CommonPort(), Width: 170, MinWidth: 90},
-		{Title: locales.CommonDependsOn(), Width: 140, MinWidth: 80},
-		{Title: locales.CommonReplicas(), Width: 60, MinWidth: 50, Align: ui.End},
+		// 列宽按「详情区 678 − 选项栏 210 − 分隔」≈ 460 来配：
+		// MinWidth 合计 250，保证表格能被压到 460 而不溢出，
+		// 把空间让给右侧的启动选项（之前它被裁在窗口外）。
+		{Title: locales.ComposeServices(), Width: 130, MinWidth: 70},
+		{Title: locales.ContainersImage(), MinWidth: 110},
+		{Title: locales.CommonPort(), Width: 120, MinWidth: 60},
+		{Title: locales.CommonDependsOn(), Width: 100, MinWidth: 50},
+		{Title: locales.CommonReplicas(), Width: 46, MinWidth: 36, Align: ui.End},
 	}
 
 	a.serviceList.Key = func(i int) any {
@@ -535,7 +602,7 @@ func serviceDetailText(p compose.Project, name string) string {
 func (a *App) projectOptions(c *ui.Context, p compose.Project) {
 	t := c.Theme()
 
-	ui.Column(c).FillHeight().Padding(10, 12).Gap(10).Children(func() {
+	ui.Column(c).FillWidth().Shrink(1).FillHeight().Padding(10, 12).Gap(10).Children(func() {
 		ui.Text(c, locales.ComposeStartOptions()).FontSize(12).Bold().TextColor(t.TextMuted)
 
 		ui.Form(c, func() {
@@ -555,12 +622,16 @@ func (a *App) projectOptions(c *ui.Context, p compose.Project) {
 		ui.Divider(c)
 
 		ui.Text(c, locales.ComposeProjectPath()).FontSize(12).Bold().TextColor(t.TextMuted)
-		ui.Text(c, p.Dir).FontSize(11).TextColor(t.TextMuted).Selectable()
+		// SingleLine + Shrink：路径和命令都很长，不限制会把这一栏撑宽，
+		// 进而把整个右栏推出窗口（截图里「启动选项」被裁在窗口右边）。
+		ui.Text(c, p.Dir).FontSize(11).TextColor(t.TextMuted).
+			SingleLine().Shrink(1).Selectable().Tooltip(p.Dir)
 
 		ui.Spacer(c)
 
 		ui.Text(c, locales.CommonCommandPreview()).FontSize(12).Bold().TextColor(t.TextMuted)
-		ui.Text(c, a.upPreview(p)).FontSize(11).TextColor(t.TextMuted).PreserveSpaces().Selectable()
+		ui.Text(c, a.upPreview(p)).FontSize(11).TextColor(t.TextMuted).
+			SingleLine().Shrink(1).Selectable().Tooltip(a.upPreview(p))
 	})
 }
 
@@ -837,4 +908,52 @@ func (a *App) composeLogs(p compose.Project, service string, svc compose.Service
 type wslcContainerRef struct {
 	ID   string
 	Name string
+}
+
+// projectRuntime 描述一个 Compose 项目的运行状态，用于决定按钮可用性。
+type projectRuntime struct {
+	// Total 是该项目名下的容器总数。
+	Total int
+	// Running 是其中处于运行中的数量。
+	Running int
+}
+
+// Any 表示至少有一个容器在跑。
+func (r projectRuntime) Any() bool { return r.Running > 0 }
+
+// All 表示全部容器都在跑（且确实有容器）。
+func (r projectRuntime) All() bool { return r.Total > 0 && r.Running == r.Total }
+
+// None 表示没有容器在跑。
+func (r projectRuntime) None() bool { return r.Running == 0 }
+
+// projectRuntimeOf 统计某个项目的容器运行状态。
+//
+// 直接复用已加载的容器列表（它们带 com.wslc-compose.project 标签），
+// 不再额外调用 `wslc-compose ps`：每个项目一次额外进程会让
+// 项目列表刷新变得很慢，而容器列表本来就随刷新更新。
+func (a *App) projectRuntimeOf(p compose.Project) projectRuntime {
+	var rt projectRuntime
+	for _, ct := range a.containers {
+		if ct.Label("com.wslc-compose.project") != p.Name {
+			continue
+		}
+		rt.Total++
+		if ct.IsRunning() {
+			rt.Running++
+		}
+	}
+	return rt
+}
+
+// joinNames 把文件路径列表渲染成短名字，用「, 」连接。
+//
+// 完整路径放在 Tooltip 里，界面上只显示文件名，
+// 避免一行里出现好几个绝对路径把宽度撑开。
+func joinNames(paths []string) string {
+	names := make([]string, 0, len(paths))
+	for _, p := range paths {
+		names = append(names, baseName(p))
+	}
+	return strings.Join(names, ", ")
 }

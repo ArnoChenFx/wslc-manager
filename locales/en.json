@@ -428,5 +428,13 @@
   "accentBlue": "Blue",
   "accentTeal": "Teal",
   "accentAmber": "Amber",
-  "accentGreen": "Green"
+  "accentGreen": "Green",
+  "composeStartTooltip": "Start the project (up -d)",
+  "composeStopTooltip": "Stop the project's containers (stop)",
+  "composeRestartTooltip": "Restart the project's containers (restart)",
+  "composeDownTooltip": "Stop and remove the project's containers and networks (down)",
+  "composeAlreadyRunning": "The project is already running",
+  "composeNotRunning": "The project is not running",
+  "composeNothingToRemove": "The project has no containers to remove",
+  "composePartialRunning": "{running} of {total} containers running"
 }

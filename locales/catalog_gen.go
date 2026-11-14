@@ -4413,3 +4413,85 @@ func AccentGreen() string { return In(i18n.Locale()).AccentGreen() }
 func (msgs Messages) AccentGreen() string {
 	return Catalog.Format(msgs.locale, "accentGreen", nil)
 }
+
+// ComposeStartTooltip says "启动项目（等价于 up -d）"
+// in the language the app shows.
+func ComposeStartTooltip() string { return In(i18n.Locale()).ComposeStartTooltip() }
+
+// ComposeStartTooltip says "启动项目（等价于 up -d）"
+// in the language of msgs.
+func (msgs Messages) ComposeStartTooltip() string {
+	return Catalog.Format(msgs.locale, "composeStartTooltip", nil)
+}
+
+// ComposeStopTooltip says "停止项目容器（等价于 stop）"
+// in the language the app shows.
+func ComposeStopTooltip() string { return In(i18n.Locale()).ComposeStopTooltip() }
+
+// ComposeStopTooltip says "停止项目容器（等价于 stop）"
+// in the language of msgs.
+func (msgs Messages) ComposeStopTooltip() string {
+	return Catalog.Format(msgs.locale, "composeStopTooltip", nil)
+}
+
+// ComposeRestartTooltip says "重启项目容器（等价于 restart）"
+// in the language the app shows.
+func ComposeRestartTooltip() string { return In(i18n.Locale()).ComposeRestartTooltip() }
+
+// ComposeRestartTooltip says "重启项目容器（等价于 restart）"
+// in the language of msgs.
+func (msgs Messages) ComposeRestartTooltip() string {
+	return Catalog.Format(msgs.locale, "composeRestartTooltip", nil)
+}
+
+// ComposeDownTooltip says "停止并移除项目容器与网络（等价于 down）"
+// in the language the app shows.
+func ComposeDownTooltip() string { return In(i18n.Locale()).ComposeDownTooltip() }
+
+// ComposeDownTooltip says "停止并移除项目容器与网络（等价于 down）"
+// in the language of msgs.
+func (msgs Messages) ComposeDownTooltip() string {
+	return Catalog.Format(msgs.locale, "composeDownTooltip", nil)
+}
+
+// ComposeAlreadyRunning says "项目已在运行"
+// in the language the app shows.
+func ComposeAlreadyRunning() string { return In(i18n.Locale()).ComposeAlreadyRunning() }
+
+// ComposeAlreadyRunning says "项目已在运行"
+// in the language of msgs.
+func (msgs Messages) ComposeAlreadyRunning() string {
+	return Catalog.Format(msgs.locale, "composeAlreadyRunning", nil)
+}
+
+// ComposeNotRunning says "项目没有在运行"
+// in the language the app shows.
+func ComposeNotRunning() string { return In(i18n.Locale()).ComposeNotRunning() }
+
+// ComposeNotRunning says "项目没有在运行"
+// in the language of msgs.
+func (msgs Messages) ComposeNotRunning() string {
+	return Catalog.Format(msgs.locale, "composeNotRunning", nil)
+}
+
+// ComposeNothingToRemove says "项目没有容器可移除"
+// in the language the app shows.
+func ComposeNothingToRemove() string { return In(i18n.Locale()).ComposeNothingToRemove() }
+
+// ComposeNothingToRemove says "项目没有容器可移除"
+// in the language of msgs.
+func (msgs Messages) ComposeNothingToRemove() string {
+	return Catalog.Format(msgs.locale, "composeNothingToRemove", nil)
+}
+
+// ComposePartialRunning says "{running}/{total} 个容器在运行"
+// in the language the app shows.
+func ComposePartialRunning(running int, total int) string {
+	return In(i18n.Locale()).ComposePartialRunning(running, total)
+}
+
+// ComposePartialRunning says "{running}/{total} 个容器在运行"
+// in the language of msgs.
+func (msgs Messages) ComposePartialRunning(running int, total int) string {
+	return Catalog.Format(msgs.locale, "composePartialRunning", map[string]any{"running": running, "total": total})
+}

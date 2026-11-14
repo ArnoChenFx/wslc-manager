@@ -1087,5 +1087,23 @@
   "accentBlue": "蓝",
   "accentTeal": "青绿",
   "accentAmber": "琥珀",
-  "accentGreen": "绿"
+  "accentGreen": "绿",
+  "composeStartTooltip": "启动项目（等价于 up -d）",
+  "composeStopTooltip": "停止项目容器（等价于 stop）",
+  "composeRestartTooltip": "重启项目容器（等价于 restart）",
+  "composeDownTooltip": "停止并移除项目容器与网络（等价于 down）",
+  "composeAlreadyRunning": "项目已在运行",
+  "composeNotRunning": "项目没有在运行",
+  "composeNothingToRemove": "项目没有容器可移除",
+  "composePartialRunning": "{running}/{total} 个容器在运行",
+  "@composePartialRunning": {
+    "placeholders": {
+      "running": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  }
 }
