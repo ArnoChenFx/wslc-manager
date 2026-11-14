@@ -532,7 +532,6 @@ func (a *App) refreshProjects() {
 		return
 	}
 	dirs := append([]string{}, a.settings.Projects...)
-
 	a.projectLoadSeq++
 	seq := a.projectLoadSeq
 

@@ -1,8 +1,10 @@
 package compose
 
 import (
+	"context"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestParsePSTable(t *testing.T) {
@@ -199,5 +201,46 @@ func TestScanMissingRoot(t *testing.T) {
 	got := Scan(ScanOptions{Roots: []string{`Z:\definitely\not\here`}, Depth: 2})
 	if len(got) != 0 {
 		t.Errorf("不存在的根目录应返回空, got %v", got)
+	}
+}
+
+// TestRunReleasesLock 验证 run 在成功后释放互斥锁。
+//
+// 回归测试：run 里曾经只写了 c.mu.Lock() 却没有 Unlock，
+// 第一次调用成功后锁被永久持有，第二次调用直接死锁。
+// 用户看到的现象是「添加了 compose 项目，但列表一直是空的」——
+// 因为刷新项目时要连续加载多个目录，卡在第二个上，
+// 整批结果永远不会回写界面。
+//
+// 这个测试用真实 wslc-compose 连续跑两次；没有装就跳过。
+func TestRunReleasesLock(t *testing.T) {
+	c, err := New()
+	if err != nil {
+		t.Skipf("跳过：%v", err)
+	}
+
+	ctx := context.Background()
+
+	// 用一个保证存在的目录（临时目录）跑两次 --version。
+	// --version 不依赖 compose 文件，因此不会因为缺少项目而失败。
+	dir := t.TempDir()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 3; i++ {
+			if _, err := c.run(ctx, dir, "--version"); err != nil {
+				t.Errorf("第 %d 次调用失败: %v", i+1, err)
+				return
+			}
+		}
+	}()
+
+	// 死锁时上面的 goroutine 永远不结束；用超时把它暴露成失败，
+	// 而不是让整个测试进程挂住。
+	select {
+	case <-done:
+	case <-time.After(30 * time.Second):
+		t.Fatal("三次连续调用超时：互斥锁没有释放（run 缺少 Unlock）")
 	}
 }

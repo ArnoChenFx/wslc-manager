@@ -140,7 +140,15 @@ func (r Result) Error() error {
 func (c *Client) run(ctx context.Context, dir string, args ...string) (Result, error) {
 	start := time.Now()
 
+	// 串行化：wslc-compose 内部会调用 wslc，而 wslc 预览版
+	// 同一时刻只容忍一个调用。
+	//
+	// 这里必须 defer 解锁。曾经只写了 c.mu.Lock() 而没有解锁，
+	// 结果第一次 config 成功后就永久持有锁，第二个项目直接死锁——
+	// 界面上表现为「项目列表一直是空的」，日志里则只有
+	// 「LoadProject 开始」而没有对应的「结束」。
 	c.mu.Lock()
+	defer c.mu.Unlock()
 
 	if ctx == nil {
 		ctx = context.Background()
