@@ -33,7 +33,11 @@ func (a *App) envCard(c *ui.Context) {
 	//   1. 违反分层约定，视图变成有副作用的；
 	//   2. 检测结果异步回填会改变布局高度，导致界面在渲染中途跳动
 	//      （测量类测试会因此随机失败——CI 上就真的踩到了）。
-	// 首次检测由 Init 触发，之后由「重新检测」按钮刷新。
+	// 首次检测由 Init 触发；安装 / 更新 WSL 结束后由 finishEnv 自动重检。
+	//
+	// 这张卡片上没有「重新检测」按钮：卡片里只有 wslc 和内置引擎两行，
+	// 没有什么需要用户专门点一下来刷新的。需要手动重来的入口在别处：
+	// wslc 缺失时的错误页（用户在应用外装好 WSL 后回来点），以及系统页维护区的「重新检测环境」。
 
 	a.infoCard(c, locales.EnvTitle(), func() {
 		if !a.envChecked {
@@ -88,16 +92,6 @@ func (a *App) envCard(c *ui.Context) {
 				ui.Text(c, locales.CommonBuiltin()+" "+compose.Version).FontSize(11).TextColor(t.TextMuted)
 			} else {
 				ui.Text(c, locales.EnvNeedsWslc()).FontSize(11).TextColor(t.Danger)
-			}
-		})
-
-		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
-			busy := a.isBusy("env-detect")
-			if ui.Button(c, locales.ErrorRecheck()).Disabled(busy).Clicked() {
-				a.detectEnvironment()
-			}
-			if busy {
-				ui.Spinner(c).Size(12, 12)
 			}
 		})
 	})
