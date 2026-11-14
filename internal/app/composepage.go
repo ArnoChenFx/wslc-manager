@@ -76,58 +76,61 @@ func (a *App) projectListPane(c *ui.Context) {
 		styleRows(&a.projectList, t)
 		syncRowSelection(&a.projectList, a.projectSel)
 
-		ui.List(c, &a.projectList, len(rows), func(i int) {
-			p := rows[i]
-			ui.Column(c).Padding(6, 10).Gap(2).Children(func() {
-				ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
-					ic := ui.Icon(c, icon("stack")).FontSize(14)
-					if !p.Healthy() {
-						ic.TextColor(t.Danger)
-					}
-					// 这里刻意不加 Selectable：
-					// 列表行几乎被文字铺满，一旦文字可选，
-					// 点击就变成选文字而不是选行，导致行几乎无法选中。
-					// 想复制路径的话，右键菜单里有「复制目录路径」。
-					ui.Text(c, p.Name).Bold().SingleLine().Grow(1)
-					if n := len(p.Config.Services); n > 0 {
-						ui.Badge(c, fmt.Sprint(n)).TextColor(t.TextMuted)
-					}
+		// 列表用一份专门的柔和主题：MyGo 的 List 选中行会整片铺 accent，
+		// 而按钮需要饱和的 accent，两者冲突，只能在子树上覆盖。
+		ui.Themed(c, listTheme(t)).Fill().Children(func() {
+			ui.List(c, &a.projectList, len(rows), func(i int) {
+				p := rows[i]
+				ui.Column(c).Padding(6, 10).Gap(2).Children(func() {
+					ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
+						ic := ui.Icon(c, icon("stack")).FontSize(14)
+						if !p.Healthy() {
+							ic.TextColor(t.Danger)
+						}
+						// 这里刻意不加 Selectable：
+						// 列表行几乎被文字铺满，一旦文字可选，
+						// 点击就变成选文字而不是选行，导致行几乎无法选中。
+						// 想复制路径的话，右键菜单里有「复制目录路径」。
+						ui.Text(c, p.Name).Bold().SingleLine().Grow(1)
+						if n := len(p.Config.Services); n > 0 {
+							ui.Badge(c, fmt.Sprint(n)).TextColor(t.TextMuted)
+						}
+					})
+					ui.Text(c, baseName(p.Dir)).FontSize(11).TextColor(t.TextMuted).SingleLine()
 				})
-				ui.Text(c, baseName(p.Dir)).FontSize(11).TextColor(t.TextMuted).SingleLine()
+			}).Grow(1).Label(locales.ComposeList()).Children(func() {
+				// 空列表时显示提示。
+				// 必须挂在 List 自己的 Children 上，而不是在 List 之后再并一个
+				// Fill() 的 Column：后者会把 Grow(1) 的列表压成 0 高度
+				// （实测中列表高度真的变成了 0，行自然点不中）。
+				if len(rows) > 0 {
+					return
+				}
+				ui.Column(c).Padding(16).Gap(8).Children(func() {
+					ui.Text(c, locales.ComposeEmptyTitle()).FontSize(13).TextColor(t.TextMuted)
+					ui.Text(c, locales.ComposeEmptyBody()).FontSize(11).TextColor(t.TextMuted)
+				})
+			}).ContextMenu(func(m *ui.Menu) {
+				if a.projectSel < 0 || a.projectSel >= len(rows) {
+					return
+				}
+				p := rows[a.projectSel]
+				if m.Item(locales.CommonOpenInExplorer()).Chosen() {
+					a.openInExplorer(p.Dir)
+				}
+				if m.Item(locales.ComposeCopyDir()).Chosen() {
+					c.WriteClipboard(p.Dir)
+					a.toast(locales.CommonCopied())
+				}
+				if m.Item(locales.ComposeReload()).Chosen() {
+					a.refreshProjects()
+				}
+				m.Separator()
+				if m.Item(locales.ComposeRemoveFromList()).Chosen() {
+					a.RemoveProject(p.Dir)
+				}
 			})
-		}).Grow(1).Label(locales.ComposeList()).Children(func() {
-			// 空列表时显示提示。
-			// 必须挂在 List 自己的 Children 上，而不是在 List 之后再并一个
-			// Fill() 的 Column：后者会把 Grow(1) 的列表压成 0 高度
-			// （实测中列表高度真的变成了 0，行自然点不中）。
-			if len(rows) > 0 {
-				return
-			}
-			ui.Column(c).Padding(16).Gap(8).Children(func() {
-				ui.Text(c, locales.ComposeEmptyTitle()).FontSize(13).TextColor(t.TextMuted)
-				ui.Text(c, locales.ComposeEmptyBody()).FontSize(11).TextColor(t.TextMuted)
-			})
-		}).ContextMenu(func(m *ui.Menu) {
-			if a.projectSel < 0 || a.projectSel >= len(rows) {
-				return
-			}
-			p := rows[a.projectSel]
-			if m.Item(locales.CommonOpenInExplorer()).Chosen() {
-				a.openInExplorer(p.Dir)
-			}
-			if m.Item(locales.ComposeCopyDir()).Chosen() {
-				c.WriteClipboard(p.Dir)
-				a.toast(locales.CommonCopied())
-			}
-			if m.Item(locales.ComposeReload()).Chosen() {
-				a.refreshProjects()
-			}
-			m.Separator()
-			if m.Item(locales.ComposeRemoveFromList()).Chosen() {
-				a.RemoveProject(p.Dir)
-			}
 		})
-
 	})
 }
 

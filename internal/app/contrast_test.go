@@ -153,3 +153,41 @@ func colorDistance(a, b ui.Color) float64 {
 	db := (float64(a.B) - float64(b.B)) / 255
 	return math.Sqrt(dr*dr + dg*dg + db*db)
 }
+
+// TestListThemeSoftensSelection 确保列表（ui.List）的选中行也是柔和色。
+//
+// 回归测试：MyGo 的 ui.List 选中行一律用 accent 整片填充
+// （CellsStyle 只对 Table 生效，它内部要求 f.flat）。
+// Compose 项目列表正是 ui.List，所以之前被画成一大块饱和色，
+// 副标题灰字压在上面几乎看不清。
+//
+// listTheme 把 Accent 换成与背景预混合的柔和色并令 AccentText 等于
+// 正常前景色；这里断言两个性质：
+//   - 底色明显区别于原始 accent（不再整片饱和）；
+//   - 选中行的文字对比度达标。
+func TestListThemeSoftensSelection(t *testing.T) {
+	for _, dark := range []bool{true, false} {
+		name := "light"
+		if dark {
+			name = "dark"
+		}
+		t.Run(name, func(t *testing.T) {
+			for _, choice := range accentPalette {
+				base := productTheme(dark)
+				applyAccent(base, choice)
+
+				lt := listTheme(base)
+
+				if colorDistance(lt.Accent, base.Accent) < 0.05 {
+					t.Errorf("%s/%s: 列表主题的 accent 与原始 accent 几乎相同，"+
+						"选中行会变成整片饱和色", name, choice.Key)
+				}
+				ratio := contrastRatio(lt.AccentText, lt.Accent)
+				if ratio < 4.5 {
+					t.Errorf("%s/%s: 列表选中行文字对比度 %.2f < 4.5",
+						name, choice.Key, ratio)
+				}
+			}
+		})
+	}
+}

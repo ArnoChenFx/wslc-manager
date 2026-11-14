@@ -206,3 +206,28 @@ func syncRowSelection(s *ui.ListState, selected int) {
 		sel.Add(k)
 	}
 }
+
+// listTheme 返回一份「专供列表/表格使用」的主题。
+//
+// 为什么需要：MyGo 的 ui.List 选中行一律用 accent 整片填充
+// （见 list.go 的 w.Selected(on)），而 accent 同时也是按钮颜色。
+// 按钮需要饱和、选中行需要柔和，两者是冲突的诉求，主题里只有一个字段。
+//
+// CellsStyle 可以绕过这个限制，但它只对 Table 生效
+// （内部要求 f.flat）。Compose 项目列表是 ui.List，用不上。
+//
+// 所以这里派生一份主题：把 Accent 换成与背景预混合的柔和色，
+// 只作用于列表所在子树（ui.Themed）。按钮在别处渲染，不受影响。
+//
+// 同时把 AccentText 设成正常前景色，使选中行的文字仍然清晰——
+// 这也正是用户报告「看不清」的那一半问题。
+func listTheme(base *ui.Theme) *ui.Theme {
+	t := *base
+	t.Accent = rowSelection(base, base.Accent)
+	t.AccentHover = t.Accent
+	t.AccentPressed = t.Accent
+	t.AccentText = base.Text
+	// 失焦时不要退回灰色：列表选中项应保持可辨识。
+	t.InactiveAccent = t.Accent
+	return &t
+}
