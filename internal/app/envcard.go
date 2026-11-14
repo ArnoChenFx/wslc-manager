@@ -17,6 +17,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
+	"github.com/arno/wslc-manager/internal/compose"
 	"github.com/arno/wslc-manager/internal/envsetup"
 	"github.com/arno/wslc-manager/locales"
 )
@@ -77,54 +78,28 @@ func (a *App) envCard(c *ui.Context) {
 
 		ui.Divider(c)
 
-		// ── wslc-compose ──────────────────────────────
+		// ── wslc-compose（内置）──────────────────────────
+		// 编排引擎随应用发布，没有「安装 / 升级」可言，因此这里只显示它的状态：
+		// 唯一的前提是 wslc 可用，其它不需要用户做任何事。
 		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
-			a.envStatusIcon(c, st.ComposeOK())
+			a.envStatusIcon(c, st.WSLCOK())
 			ui.Text(c, "wslc-compose").FontSize(12).Bold().Grow(1)
-			if st.ComposeOK() {
-				ui.Text(c, locales.EnvInstalled(st.ComposeVersion)).FontSize(11).TextColor(t.TextMuted)
+			if st.WSLCOK() {
+				ui.Text(c, locales.CommonBuiltin()+" "+compose.Version).FontSize(11).TextColor(t.TextMuted)
 			} else {
-				ui.Text(c, locales.EnvMissing()).FontSize(11).TextColor(t.Danger)
+				ui.Text(c, locales.EnvNeedsWslc()).FontSize(11).TextColor(t.Danger)
 			}
 		})
 
-		if st.ComposeOK() && st.ComposeOutdated() {
-			ui.Text(c, locales.EnvOutdated(st.ComposeVersion, st.Latest)).FontSize(11).TextColor(t.Warning)
-		}
-
 		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
-			busy := a.isBusy("env-compose")
-			switch {
-			case !st.ComposeOK():
-				if st.CanInstallCompose() {
-					label := locales.EnvInstallCompose()
-					if ups := st.Latest; ups != "" {
-						label = locales.EnvInstallComposeVersion(ups)
-					}
-					if ui.PrimaryButton(c, label).Disabled(busy || st.Latest == "").Clicked() {
-						a.runEnvArgs("env-compose", st.InstallComposeArgs)
-					}
-				} else {
-					ui.Text(c, locales.EnvNoUpgrader()).FontSize(11).TextColor(t.Warning)
-				}
-			case st.ComposeOutdated():
-				if ui.PrimaryButton(c, locales.EnvUpgradeCompose()).Disabled(busy).Clicked() {
-					a.runEnvArgs("env-compose", st.UpgradeComposeArgs)
-				}
-			}
-
+			busy := a.isBusy("env-detect")
 			if ui.Button(c, locales.ErrorRecheck()).Disabled(busy).Clicked() {
 				a.detectEnvironment()
 			}
-
 			if busy {
 				ui.Spinner(c).Size(12, 12)
 			}
 		})
-
-		if st.Err != "" {
-			ui.Text(c, st.Err).FontSize(11).TextColor(t.Warning).MaxWidth(560)
-		}
 	})
 }
 
@@ -147,8 +122,7 @@ func (a *App) detectEnvironment() {
 	a.logInfo("env", "开始检测依赖环境")
 
 	go func() {
-		// 第一步：只看本机装了什么。纯本地、几十毫秒完成，
-		// 界面马上就能显示「wslc / wslc-compose 是否就绪」。
+		// 只看本机装了什么：纯本地、不访问网络，几十毫秒完成。
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
 		st := envsetup.Detect(ctx)
@@ -156,26 +130,8 @@ func (a *App) detectEnvironment() {
 		a.update(func() {
 			a.env = st
 			a.envChecked = true
-			a.logInfo("env", "本地检测完成: wslc=%v compose=%v upgrader=%s",
-				st.WSLCOK(), st.ComposeOK(), st.Upgrader)
-		})
-
-		// 第二步：问 PyPI 有没有新版本。
-		//
-		// 单独一步是因为它要走网络（实测 1 秒以上，还依赖网络状况）。
-		// 放在启动路径上会明显拖慢「窗口打开后能用」的时间，
-		// 而「要不要升级」并不急。
-		late := envsetup.DetectOnline(ctx, st)
-		a.update(func() {
-			a.env.Latest = late.Latest
-			a.env.Err = late.Err
 			a.setBusy("env-detect", false)
-			if late.Latest != "" {
-				a.logInfo("env", "PyPI 最新版: %s", late.Latest)
-			}
-			if late.Err != "" {
-				a.logWarn("env", "查询更新失败: %s", late.Err)
-			}
+			a.logInfo("env", "检测完成: wslc=%v winget=%v", st.WSLCOK(), st.CanInstallWSL())
 		})
 	}()
 }
@@ -257,7 +213,7 @@ func (a *App) finishEnv(key, msg string) {
 	a.logInfo("env", "%s", msg)
 	// 环境变了，重新体检一次让界面反映真实状态。
 	a.detectEnvironment()
-	// 装完 wslc-compose 后，之前不可用的 compose 客户端要重建。
+	// 装完 WSL 后，之前因 wslc 缺失而不可用的 wslc / compose 客户端要重建。
 	a.Init()
 	a.refreshProjects()
 }
@@ -267,6 +223,5 @@ func (a *App) envSummary() string {
 	if !a.envChecked {
 		return "尚未检测"
 	}
-	return fmt.Sprintf("wslc=%v compose=%v connect=%s",
-		a.env.WSLCOK(), a.env.ComposeOK(), a.env.ComposeVersion)
+	return fmt.Sprintf("wslc=%v wsl=%s winget=%v", a.env.WSLCOK(), a.env.WSLVersion, a.env.CanInstallWSL())
 }

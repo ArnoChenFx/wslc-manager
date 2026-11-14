@@ -26,20 +26,38 @@
 ```
 internal/app      → 只依赖 wslc / compose / store / selfupdate，不直接 exec
 internal/wslc     → 只封装 wslc 命令行
-internal/compose  → 只封装 wslc-compose
+internal/compose  → 内置的 Compose 引擎：依赖 compose-go，经 Runtime 接口调用 wslc；
+                    不 import internal/wslc，也不 import internal/app
 internal/store    → 只读写设置文件
 internal/selfupdate → 只封装 MyGo 的更新插件（注册、读状态、触发检查）
 ```
 
 - **内部包不允许反向依赖 `internal/app`。**
+- `internal/app/composert.go` 是唯一把 `wslc.Client` 适配成 `compose.Runtime` 的地方。
 - 视图层不做 IO。所有慢操作走 `runAsync` / 后台 goroutine，
   结果经 `Window.Update` 回主线程。
 
 ## 关于 compose 解析
 
-**不要自己解析 compose YAML。** 一律调用 `wslc-compose config` 拿已解析结果。
-自己解析会漏掉变量插值、`.env`、`include`、profile、命名卷前缀等语义，
+**不要自己解析 compose YAML。** 一律走 `internal/compose` 的 `loadProject`（它调用 compose-go）。
+自己解析会漏掉变量插值、`.env`、`include`、`extends`、profile、命名卷前缀等语义，
 导致界面所示与实际运行不一致。
+
+界面展示用的 `compose.Project` / `ServiceConfig` 是 compose-go 模型的精简投影（`view.go`），
+不要把 compose-go 的类型穿透到 `internal/app`。
+
+## 关于 compose 引擎
+
+编排（up/down/start/…）由本仓库自己实现，不依赖任何外部编排工具。
+
+- 所有 wslc 调用经 `Runtime` 接口。测试用 `fakeWslc`（`fake_test.go`）验证流程，
+  **不要**为了测流程去碰真实 wslc。
+- 配置指纹（`hash.go`）是对**生成出来的 wslc 参数**求哈希：改 `flags.go` 里参数的顺序或格式，
+  会让所有现有容器在下次 `up` 时重建一次。改之前想清楚，必要时升级 `hashPrefix`。
+- compose-go 的各种映射遍历顺序是随机的：凡是会进入命令行、输出或指纹的地方都必须先排序。
+- 清理半成品容器只能动「本次操作创建的」（`create-operation` 标签），绝不能按名字删。
+- 真实 wslc 测试（`realwslc_test.go`）只用本机已有的小镜像、唯一项目名，结束必清理；
+  没有 wslc 或没有镜像时自动跳过。绝不碰用户已有的容器、网络、卷。
 
 ## 测试要求
 
@@ -50,7 +68,8 @@ internal/selfupdate → 只封装 MyGo 的更新插件（注册、读状态、�
 | 解析逻辑（标签、表格、JSON、配置） | 表驱动单测 |
 | 目录扫描 | 用 `t.TempDir()` 造真实目录树 |
 | 视图布局/文案 | `ui.NewTester` + `Access`/`Find` 量几何 |
-| 与 wslc-compose 的契约 | 集成测试，未安装时 `t.Skip` |
+| 编排流程（up/down/重建/依赖等待/失败不连坐） | 假 `Runtime` 记录命令并断言 |
+| 与真实 wslc 的契约 | 集成测试（`realwslc_test.go`），未安装时 `t.Skip` |
 | 更新配置 / 发布流程（`mygo.json`、`release.yml`） | 契约测试：解析文件断言约定，见 `internal/selfupdate/release_test.go` |
 | 崩溃/死锁类修复 | 必须补回归测试，注释写明崩溃现象 |
 
@@ -119,7 +138,8 @@ internal/selfupdate → 只封装 MyGo 的更新插件（注册、读状态、�
 - 「点了没反应」先看运行日志里有没有对应命令，区分「没触发」还是「失败」。
 
 写日志：`a.logInfo("source", "format", ...)`，source 用 `wslc` / `compose` / `action` / `ui` / `refresh` / `diag`。
-每条 `wslc`、`wslc-compose` 命令由客户端钩子自动记录，不需要手动埋点。
+每条 `wslc` 命令由客户端钩子自动记录；每个编排动作（up/down/…）的结果由 compose 客户端的钩子记录一行，
+不需要手动埋点。
 
 详见 [docs/note/diagnostics.md](docs/note/diagnostics.md)。
 

@@ -1,59 +1,9 @@
 package compose
 
 import (
-	"context"
 	"reflect"
 	"testing"
-	"time"
 )
-
-func TestParsePSTable(t *testing.T) {
-	out := `NAME               SERVICE  IMAGE         STATUS   PORTS
-proj-db-1          db       postgres:16   running
-proj-web-1         web      nginx:alpine  running  0.0.0.0:8080->80/tcp
-`
-	got := ParsePSTable(out)
-	if len(got) != 2 {
-		t.Fatalf("应解析出 2 行, got %+v", got)
-	}
-	if got[0].Name != "proj-db-1" || got[0].Service != "db" ||
-		got[0].Image != "postgres:16" || got[0].Status != "running" {
-		t.Errorf("第一行字段错误: %+v", got[0])
-	}
-	if got[1].Ports != "0.0.0.0:8080->80/tcp" {
-		t.Errorf("端口列错误: %q", got[1].Ports)
-	}
-}
-
-func TestParsePSTableEmpty(t *testing.T) {
-	for _, in := range []string{"", "   ", "NAME SERVICE IMAGE STATUS"} {
-		if got := ParsePSTable(in); len(got) != 0 {
-			t.Errorf("输入 %q 应返回空列表, got %+v", in, got)
-		}
-	}
-}
-
-func TestSplitColumns(t *testing.T) {
-	tests := []struct {
-		in   string
-		want []string
-	}{
-		{"a  b  c", []string{"a", "b", "c"}},
-		{"  a   b  ", []string{"a", "b"}},
-		{"a b", []string{"a b"}}, // 单个空格不切分
-		{"single", []string{"single"}},
-		{"", nil},
-	}
-	for _, tc := range tests {
-		got := splitColumns(tc.in)
-		if len(got) == 0 && len(tc.want) == 0 {
-			continue
-		}
-		if !reflect.DeepEqual(got, tc.want) {
-			t.Errorf("splitColumns(%q) = %v, want %v", tc.in, got, tc.want)
-		}
-	}
-}
 
 func TestPortMappingString(t *testing.T) {
 	tests := []struct {
@@ -201,46 +151,5 @@ func TestScanMissingRoot(t *testing.T) {
 	got := Scan(ScanOptions{Roots: []string{`Z:\definitely\not\here`}, Depth: 2})
 	if len(got) != 0 {
 		t.Errorf("不存在的根目录应返回空, got %v", got)
-	}
-}
-
-// TestRunReleasesLock 验证 run 在成功后释放互斥锁。
-//
-// 回归测试：run 里曾经只写了 c.mu.Lock() 却没有 Unlock，
-// 第一次调用成功后锁被永久持有，第二次调用直接死锁。
-// 用户看到的现象是「添加了 compose 项目，但列表一直是空的」——
-// 因为刷新项目时要连续加载多个目录，卡在第二个上，
-// 整批结果永远不会回写界面。
-//
-// 这个测试用真实 wslc-compose 连续跑两次；没有装就跳过。
-func TestRunReleasesLock(t *testing.T) {
-	c, err := New()
-	if err != nil {
-		t.Skipf("跳过：%v", err)
-	}
-
-	ctx := context.Background()
-
-	// 用一个保证存在的目录（临时目录）跑两次 --version。
-	// --version 不依赖 compose 文件，因此不会因为缺少项目而失败。
-	dir := t.TempDir()
-
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		for i := 0; i < 3; i++ {
-			if _, err := c.run(ctx, dir, "--version"); err != nil {
-				t.Errorf("第 %d 次调用失败: %v", i+1, err)
-				return
-			}
-		}
-	}()
-
-	// 死锁时上面的 goroutine 永远不结束；用超时把它暴露成失败，
-	// 而不是让整个测试进程挂住。
-	select {
-	case <-done:
-	case <-time.After(30 * time.Second):
-		t.Fatal("三次连续调用超时：互斥锁没有释放（run 缺少 Unlock）")
 	}
 }

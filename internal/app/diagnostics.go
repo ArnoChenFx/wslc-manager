@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/arno/wslc-manager/internal/compose"
 	"github.com/arno/wslc-manager/locales"
 	"os"
 	"os/exec"
@@ -105,7 +106,8 @@ func (a *App) BuildDiagnostic(opt DiagOptions) (string, error) {
 		kv(locales.SystemWslcPath(), a.wslc.Binary())
 	}
 	if a.compose != nil {
-		kv(locales.SystemComposePath(), a.compose.Binary())
+		// 内置引擎没有可执行文件路径，写「内置」加引擎版本，便于确认用户跑的是哪一版。
+		kv(locales.SystemComposePath(), locales.CommonBuiltin()+" "+compose.Version)
 	}
 	kv(locales.SystemWslVersion(), a.info.WSLVersion)
 	kv(locales.SystemKernelVersion(), a.info.KernelVersion)

@@ -30,10 +30,14 @@
 ### Compose 项目
 指向一个包含 `compose.yaml`（或 `docker-compose.yml`）的目录，就能管理整组服务：启动、停止、重启、构建、拉取、移除，以及逐个服务控制。
 
-Compose 文件**不由本应用解析**。所有动作都交给 [`wslc-compose`](https://github.com/bacarndiaye/wslc-compose)，并向它索取解析后的配置。变量插值、`.env`、include、卷名前缀重写的行为与实际运行完全一致——界面所示即实际运行。
+编排功能**内置在应用里**，不需要再装任何工具。Compose 文件由 [compose-go](https://github.com/compose-spec/compose-go) 读取——也就是 `docker compose` 自己用的那个库——所以变量插值、`.env`、`include`、`extends`、多个 `-f` 文件和 profile 都遵循 Compose 规范。界面和实际执行的动作共用同一个加载器，界面所示即实际运行。
+
+已支持：`up` / `down` / `start` / `stop` / `restart` / `pull` / `build`，`depends_on` 条件（`service_healthy`、`service_completed_successfully`），健康检查，多网络（别名、静态 IP），基于文件的 secrets 与 configs，`scale`，以及 dry-run 预览。某个服务启动失败不会连累其他服务，只有依赖它的服务会被跳过。
+
+`wslc` 做不到的设置（`privileged`、`devices`、`sysctls`、`always` / `no` 之外的重启策略等）会给出警告并被忽略；会悄悄出错的用法（匿名卷、外部或非文件来源的 secret、IPv6 网络）会在创建任何东西之前被拒绝。
 
 ### 系统
-环境版本、WSL 会话，以及一键依赖检查：缺什么就装什么、旧了就升级。
+环境版本、WSL 会话，以及在缺少 `wslc` 时可一键安装或更新 WSL 的体检。
 
 ### 自更新
 应用启动后不久检查一次本仓库的发布，之后每天一次；有新版本时弹出一个小窗口，可以选 **安装更新**、**稍后提醒我** 或 **跳过这个版本**。更新包经过签名：应用用内置的公钥校验通过后才会替换自己，并且尽量只下载变化的部分。可以在**系统信息**页手动检查，也可以在**设置**里关闭自动检查和自动安装。检查时会访问 `github.com`。
@@ -41,7 +45,7 @@ Compose 文件**不由本应用解析**。所有动作都交给 [`wslc-compose`]
 自更新要求程序能写入自己所在的目录。安装包的当前用户安装、放在普通文件夹里的便携版都可以；放在 `Program Files` 下则不行，系统信息页会说明这一点。
 
 ### 诊断
-遇到布局错位或点了没反应的按钮？导出一份诊断报告：环境版本、界面上每个元素的精确坐标、最近的命令与错误日志，全在一个 Markdown 文件里。另外还有实时运行日志，记录每一次 `wslc` / `wslc-compose` 调用。
+遇到布局错位或点了没反应的按钮？导出一份诊断报告：环境版本、界面上每个元素的精确坐标、最近的命令与错误日志，全在一个 Markdown 文件里。另外还有实时运行日志，记录每一次 `wslc` 调用。
 
 ### 中英双语
 在设置里切换中文和英文，选择会被记住。
@@ -54,11 +58,8 @@ Compose 文件**不由本应用解析**。所有动作都交给 [`wslc-compose`]
 |---|---|---|
 | **Windows 10/11** | — | — |
 | **支持容器的 WSL** | 提供 `wslc.exe` | `winget install Microsoft.WSL`，或 `wsl --update` |
-| **wslc-compose** | Compose 编排（第三方，Python） | `uv tool install wslc-compose` 或 `pipx install wslc-compose` |
 
-应用会在**系统信息**页检查这两项，并在本机有 `winget` 和 `uv`/`pipx` 时帮你一键安装或升级。`wslc` 属于 WSL，所以应用不会单独下载它——而是更新 WSL。
-
-> `wslc-compose` 是另一个独立开源项目。本应用依赖它，而不是重写一套 Compose，这样行为始终与真实工具一致。
+这是唯一的依赖。应用会在**系统信息**页检查它，并在本机有 `winget` 时帮你一键安装或更新 WSL。`wslc` 属于 WSL，所以应用不会单独下载它。Compose 已内置，不需要再安装别的东西。
 
 ---
 
@@ -110,7 +111,7 @@ go build -o "WSLC Manager.exe" .
 
 - **[Go](https://go.dev)** —— 单一静态二进制，目标机器无需安装运行时。
 - **[MyGo](https://github.com/egoist/mygo)** —— 纯 Go 的原生桌面 UI。布局、主题、控件、系统原生文件对话框、平台窗口都由它提供。没有 HTML，没有 JavaScript，不打包浏览器。
-- **[wslc-compose](https://github.com/bacarndiaye/wslc-compose)** —— Compose 编排，作为外部命令调用。
+- **[compose-go](https://github.com/compose-spec/compose-go)** —— 读取并规范化 Compose 文件（`docker compose` 背后的库）。其上的 `wslc` 编排是本仓库自己的 `internal/compose` 包。
 
 ---
 

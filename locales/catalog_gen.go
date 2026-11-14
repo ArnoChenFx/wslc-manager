@@ -2246,11 +2246,11 @@ func (msgs Messages) SystemWslcPath() string {
 	return Catalog.Format(msgs.locale, "systemWslcPath", nil)
 }
 
-// SystemComposePath says "wslc-compose 路径"
+// SystemComposePath says "wslc-compose 引擎"
 // in the language the app shows.
 func SystemComposePath() string { return In(i18n.Locale()).SystemComposePath() }
 
-// SystemComposePath says "wslc-compose 路径"
+// SystemComposePath says "wslc-compose 引擎"
 // in the language of msgs.
 func (msgs Messages) SystemComposePath() string {
 	return Catalog.Format(msgs.locale, "systemComposePath", nil)
@@ -4250,58 +4250,14 @@ func (msgs Messages) EnvNoWinget() string {
 	return Catalog.Format(msgs.locale, "envNoWinget", nil)
 }
 
-// EnvOutdated says "有新版本可用：{current} → {latest}"
+// EnvNeedsWslc says "需要先安装 wslc"
 // in the language the app shows.
-func EnvOutdated(current string, latest string) string {
-	return In(i18n.Locale()).EnvOutdated(current, latest)
-}
+func EnvNeedsWslc() string { return In(i18n.Locale()).EnvNeedsWslc() }
 
-// EnvOutdated says "有新版本可用：{current} → {latest}"
+// EnvNeedsWslc says "需要先安装 wslc"
 // in the language of msgs.
-func (msgs Messages) EnvOutdated(current string, latest string) string {
-	return Catalog.Format(msgs.locale, "envOutdated", map[string]any{"current": current, "latest": latest})
-}
-
-// EnvInstallCompose says "安装 wslc-compose"
-// in the language the app shows.
-func EnvInstallCompose() string { return In(i18n.Locale()).EnvInstallCompose() }
-
-// EnvInstallCompose says "安装 wslc-compose"
-// in the language of msgs.
-func (msgs Messages) EnvInstallCompose() string {
-	return Catalog.Format(msgs.locale, "envInstallCompose", nil)
-}
-
-// EnvInstallComposeVersion says "安装 wslc-compose {version}"
-// in the language the app shows.
-func EnvInstallComposeVersion(version string) string {
-	return In(i18n.Locale()).EnvInstallComposeVersion(version)
-}
-
-// EnvInstallComposeVersion says "安装 wslc-compose {version}"
-// in the language of msgs.
-func (msgs Messages) EnvInstallComposeVersion(version string) string {
-	return Catalog.Format(msgs.locale, "envInstallComposeVersion", map[string]any{"version": version})
-}
-
-// EnvUpgradeCompose says "升级 wslc-compose"
-// in the language the app shows.
-func EnvUpgradeCompose() string { return In(i18n.Locale()).EnvUpgradeCompose() }
-
-// EnvUpgradeCompose says "升级 wslc-compose"
-// in the language of msgs.
-func (msgs Messages) EnvUpgradeCompose() string {
-	return Catalog.Format(msgs.locale, "envUpgradeCompose", nil)
-}
-
-// EnvNoUpgrader says "没有找到 uv 或 pipx。请先安装其中之一，才能一键安装 wslc-compose。"
-// in the language the app shows.
-func EnvNoUpgrader() string { return In(i18n.Locale()).EnvNoUpgrader() }
-
-// EnvNoUpgrader says "没有找到 uv 或 pipx。请先安装其中之一，才能一键安装 wslc-compose。"
-// in the language of msgs.
-func (msgs Messages) EnvNoUpgrader() string {
-	return Catalog.Format(msgs.locale, "envNoUpgrader", nil)
+func (msgs Messages) EnvNeedsWslc() string {
+	return Catalog.Format(msgs.locale, "envNeedsWslc", nil)
 }
 
 // EnvInstalling says "安装 · {tool}"

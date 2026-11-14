@@ -1,53 +1,55 @@
-// Package compose 封装 WSL 容器编排工具 wslc-compose。
+// Package compose 是内置的 Compose 编排引擎：把 compose 文件翻译成一系列 wslc 命令并执行。
 //
-// 设计取舍：
-//   - 解析 compose 文件时**不自己写 YAML 解析器**，而是调用
-//     `wslc-compose config` 拿到它已经处理好的「解析后配置」。
-//     这样变量插值、`.env`、include、profile 等语义与真正执行 `up`
-//     时完全一致，不会出现"界面显示的和服务实际跑的不一样"。
-//   - 所有写操作（up/down/start/stop/...）都直接调用 wslc-compose，
-//     保持与命令行完全相同的语义。
+// 分工：
+//   - compose 文件的读取与规范化交给 compose-go（官方实现，`docker compose` 本身用它），
+//     本包只在它之上做 wslc 特有的部分：限制检查、wslc 参数构造、配置指纹、
+//     up/down 等编排流程、网络校验与依赖等待；
+//   - 所有 wslc 调用都经过 Runtime 接口（生产环境是 internal/wslc.Client，它负责串行化），
+//     测试用假实现，编排流程可以脱离真实 wslc 验证；
+//   - 本包不依赖 internal/app。
 package compose
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
-
-	"gopkg.in/yaml.v3"
 )
 
-// ErrNotFound 表示找不到 wslc-compose 可执行文件。
-var ErrNotFound = errors.New("找不到 wslc-compose 可执行文件")
-
-// Client 是 wslc-compose 命令行的封装。
+// Client 是编排引擎的入口。可以并发使用：加载（读文件）不占锁，
+// 真正动容器的操作经由 Runtime，由它保证 wslc 调用串行。
 type Client struct {
-	bin string
+	rt Runtime
 
-	mu      sync.Mutex
+	mu sync.Mutex
+	// timeout 是单个编排动作的总超时（up/pull/build 可能很慢，默认 15 分钟）。
 	timeout time.Duration
-	// onRun 在每条命令结束后被调用，用于诊断日志。
+	// onRun 在每条动作结束后被调用，用于诊断日志。
 	onRun func(Result)
 }
 
-// SetRunHook 设置命令执行后的回调，用于诊断日志。
+// New 创建客户端。rt 是执行 wslc 命令的通道。
+func New(rt Runtime) *Client {
+	return &Client{rt: rt, timeout: 15 * time.Minute}
+}
+
+// SetTimeout 设置单个编排动作的总超时；0 表示不限。
+func (c *Client) SetTimeout(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.timeout = d
+}
+
+// SetRunHook 设置动作结束后的回调，用于诊断日志。
 func (c *Client) SetRunHook(fn func(Result)) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.onRun = fn
 }
 
-// callHook 在锁外触发执行回调。
 func (c *Client) callHook(r Result) {
 	c.mu.Lock()
 	fn := c.onRun
@@ -55,324 +57,6 @@ func (c *Client) callHook(r Result) {
 	if fn != nil {
 		fn(r)
 	}
-}
-
-// New 创建客户端并定位 wslc-compose 可执行文件。
-//
-// 查找顺序：环境变量 WSLC_COMPOSE_BIN → PATH 中的 wslc-compose。
-func New() (*Client, error) {
-	bin, err := locate()
-	if err != nil {
-		return nil, err
-	}
-	return &Client{bin: bin, timeout: 5 * time.Minute}, nil
-}
-
-// NewWithBinary 用指定路径创建客户端，主要用于测试。
-func NewWithBinary(bin string) *Client {
-	return &Client{bin: bin, timeout: 5 * time.Minute}
-}
-
-// Binary 返回 wslc-compose 的路径。
-func (c *Client) Binary() string { return c.bin }
-
-// SetTimeout 设置单条命令的超时（up/down 可能较慢，默认 5 分钟）。
-func (c *Client) SetTimeout(d time.Duration) { c.timeout = d }
-
-func locate() (string, error) {
-	if v := strings.TrimSpace(os.Getenv("WSLC_COMPOSE_BIN")); v != "" {
-		if st, err := os.Stat(v); err == nil && !st.IsDir() {
-			return v, nil
-		}
-		return "", fmt.Errorf("%w: WSLC_COMPOSE_BIN 指向的 %q 不存在", ErrNotFound, v)
-	}
-	if p, err := exec.LookPath("wslc-compose"); err == nil {
-		return p, nil
-	}
-	return "", fmt.Errorf("%w：请先安装（例如 pipx install wslc-compose），或用 WSLC_COMPOSE_BIN 指定路径", ErrNotFound)
-}
-
-// Result 是一条 wslc-compose 命令的结果。
-type Result struct {
-	Args     []string
-	Stdout   string
-	Stderr   string
-	ExitCode int
-	Duration time.Duration
-}
-
-// Ok 表示命令是否成功。
-func (r Result) Ok() bool { return r.ExitCode == 0 }
-
-// Combined 合并使用 stdout 与 stderr，用于展示进度/日志。
-func (r Result) Combined() string {
-	var b strings.Builder
-	b.WriteString(r.Stdout)
-	if r.Stderr != "" {
-		if b.Len() > 0 && !strings.HasSuffix(r.Stdout, "\n") {
-			b.WriteString("\n")
-		}
-		b.WriteString(r.Stderr)
-	}
-	return strings.TrimRight(b.String(), "\n")
-}
-
-// Error 把失败结果转成 error。
-func (r Result) Error() error {
-	if r.Ok() {
-		return nil
-	}
-	msg := strings.TrimSpace(r.Stderr)
-	if msg == "" {
-		msg = strings.TrimSpace(r.Stdout)
-	}
-	if msg == "" {
-		msg = fmt.Sprintf("退出码 %d", r.ExitCode)
-	}
-	return errors.New(msg)
-}
-
-// run 在指定目录执行 wslc-compose。
-//
-// dir 是 compose 项目目录；wslc-compose 会在该目录（及其父目录）里
-// 自动查找 compose 文件，因此传入 -f 不是必须的。但为了让行为确定，
-// 调用方会显式传入文件路径。
-func (c *Client) run(ctx context.Context, dir string, args ...string) (Result, error) {
-	start := time.Now()
-
-	// 串行化：wslc-compose 内部会调用 wslc，而 wslc 预览版
-	// 同一时刻只容忍一个调用。
-	//
-	// 这里必须 defer 解锁。曾经只写了 c.mu.Lock() 而没有解锁，
-	// 结果第一次 config 成功后就永久持有锁，第二个项目直接死锁——
-	// 界面上表现为「项目列表一直是空的」，日志里则只有
-	// 「LoadProject 开始」而没有对应的「结束」。
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	if c.timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.timeout)
-		defer cancel()
-	}
-
-	cmd := exec.CommandContext(ctx, c.bin, args...)
-	cmd.Dir = dir
-	hideWindow(cmd)
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	cmd.Env = append(os.Environ(), "PYTHONIOENCODING=utf-8", "PYTHONUTF8=1")
-
-	err := cmd.Run()
-	res := Result{
-		Args:     args,
-		Stdout:   stdout.String(),
-		Stderr:   stderr.String(),
-		Duration: time.Since(start),
-	}
-	if err != nil {
-		var ee *exec.ExitError
-		if errors.As(err, &ee) {
-			res.ExitCode = ee.ExitCode()
-			return res, nil
-		}
-		res.ExitCode = -1
-		if ctx.Err() != nil {
-			res.Stderr = strings.TrimSpace(res.Stderr + "\n" + ctx.Err().Error())
-		}
-		return res, fmt.Errorf("执行 wslc-compose %s 失败: %w", strings.Join(args, " "), err)
-	}
-	return res, nil
-}
-
-// RunOK 执行命令并在失败时返回 error。
-func (c *Client) RunOK(ctx context.Context, dir string, args ...string) (Result, error) {
-	res, err := c.run(ctx, dir, args...)
-	if err != nil {
-		return res, err
-	}
-	return res, res.Error()
-}
-
-// ProjectConfig 是 `wslc-compose config` 输出的解析后配置。
-//
-// 只声明界面需要的字段；其余字段会被 YAML 解析器忽略。
-type ProjectConfig struct {
-	// Name 是项目名（来自 name: 或目录名）。
-	Name string `yaml:"name"`
-	// Directory 是项目根目录的绝对路径。
-	Directory string `yaml:"directory"`
-	// ComposeFiles 是实际参与合并的 compose 文件列表。
-	ComposeFiles []string `yaml:"compose_files"`
-	// EnvFile 是使用的 .env 文件（可能为 null）。
-	EnvFile *string `yaml:"env_file"`
-	// Services 是服务名 → 服务定义。
-	Services map[string]ServiceConfig `yaml:"services"`
-}
-
-// ServiceConfig 是单个服务的解析后配置（只取界面会显示的部分）。
-type ServiceConfig struct {
-	Name       string             `yaml:"name"`
-	Image      string             `yaml:"image"`
-	Build      *BuildConfig       `yaml:"build"`
-	Command    any                `yaml:"command"`
-	Entrypoint any                `yaml:"entrypoint"`
-	Container  string             `yaml:"container_name"`
-	Env        map[string]*string `yaml:"environment"`
-	Ports      []PortMapping      `yaml:"ports"`
-	Volumes    []VolumeMapping    `yaml:"volumes"`
-	Networks   []string           `yaml:"networks"`
-	DependsOn  []string           `yaml:"depends_on"`
-	Labels     map[string]string  `yaml:"labels"`
-	Restart    *string            `yaml:"restart"`
-	Profiles   []string           `yaml:"profiles"`
-	Replicas   int                `yaml:"replicas"`
-	Health     *HealthcheckConfig `yaml:"healthcheck"`
-	User       *string            `yaml:"user"`
-	WorkingDir *string            `yaml:"working_dir"`
-}
-
-// BuildConfig 是构建配置。
-type BuildConfig struct {
-	Context    string `yaml:"context"`
-	Dockerfile string `yaml:"dockerfile"`
-}
-
-// PortMapping 是端口映射。
-type PortMapping struct {
-	Target    int    `yaml:"target"`
-	Published string `yaml:"published"`
-	Protocol  string `yaml:"protocol"`
-}
-
-// String 返回 "host:container/proto" 形式的可读文本。
-func (p PortMapping) String() string {
-	if p.Published == "" || p.Published == "none" {
-		return fmt.Sprintf("%d/%s", p.Target, proto(p.Protocol))
-	}
-	return fmt.Sprintf("%s:%d/%s", p.Published, p.Target, proto(p.Protocol))
-}
-
-func proto(s string) string {
-	if s == "" {
-		return "tcp"
-	}
-	return s
-}
-
-// VolumeMapping 是挂载。
-type VolumeMapping struct {
-	Type     string `yaml:"type"`
-	Source   string `yaml:"source"`
-	Target   string `yaml:"target"`
-	ReadOnly bool   `yaml:"read_only"`
-}
-
-// String 返回 "source:target" 形式的可读文本。
-func (v VolumeMapping) String() string {
-	src := v.Source
-	if src == "" {
-		src = "anonymous"
-	}
-	s := src + ":" + v.Target
-	if v.ReadOnly {
-		s += ":ro"
-	}
-	return s
-}
-
-// HealthcheckConfig 是健康检查配置。
-type HealthcheckConfig struct {
-	Test        []string `yaml:"test"`
-	Interval    string   `yaml:"interval"`
-	Timeout     string   `yaml:"timeout"`
-	Retries     int      `yaml:"retries"`
-	StartPeriod string   `yaml:"start_period"`
-	Disable     bool     `yaml:"disable"`
-}
-
-// Project 是界面中使用的一个 compose 项目。
-type Project struct {
-	// Dir 是项目目录（包含 compose 文件的目录）。
-	Dir string
-	// Name 是项目名（wslc-compose 解析出的）。
-	Name string
-	// Config 是解析后的完整配置。
-	Config ProjectConfig
-	// Err 非空表示这个项目加载失败（目录不存在、YAML 语法错误等），
-	// 此时 Config 为空，界面会展示错误并允许用户移除它。
-	Err string
-}
-
-// Healthy 表示项目配置加载成功。
-func (p Project) Healthy() bool { return p.Err == "" }
-
-// LoadConfig 在 dir 下执行 `wslc-compose config` 并解析结果。
-//
-// files 为空时让 wslc-compose 自动探测 compose 文件；否则作为
-// 覆盖文件传入。extraEnv 会作为额外的环境变量传入子进程，
-// 用于按项目保存的 .env 覆盖项。
-func (c *Client) LoadConfig(ctx context.Context, dir string, files []string, projectName string) (ProjectConfig, error) {
-	args := []string{}
-	for _, f := range files {
-		args = append(args, "-f", f)
-	}
-	if projectName != "" {
-		args = append(args, "-p", projectName)
-	}
-	args = append(args, "config")
-
-	res, err := c.RunOK(ctx, dir, args...)
-	if err != nil {
-		return ProjectConfig{}, err
-	}
-
-	var cfg ProjectConfig
-	dec := yaml.NewDecoder(strings.NewReader(res.Stdout))
-	if err := dec.Decode(&cfg); err != nil {
-		return ProjectConfig{}, fmt.Errorf("解析 wslc-compose config 输出失败: %w", err)
-	}
-	if cfg.Directory == "" {
-		cfg.Directory = dir
-	}
-	if cfg.Name == "" {
-		cfg.Name = filepath.Base(dir)
-	}
-	return cfg, nil
-}
-
-// LoadProject 加载项目目录并返回完整 Project。
-func (c *Client) LoadProject(ctx context.Context, dir string) (Project, error) {
-	cfg, err := c.LoadConfig(ctx, dir, nil, "")
-	if err != nil {
-		return Project{}, err
-	}
-	return Project{Dir: cfg.Directory, Name: cfg.Name, Config: cfg}, nil
-}
-
-// ServiceNames 返回排序后的服务名列表。
-func (p Project) ServiceNames() []string {
-	names := make([]string, 0, len(p.Config.Services))
-	for n := range p.Config.Services {
-		names = append(names, n)
-	}
-	sort.Strings(names)
-	return names
-}
-
-// ComposeFile 返回主 compose 文件路径（第一个）。
-//
-// 找不到时返回空字符串。
-func (p Project) ComposeFile() string {
-	if len(p.Config.ComposeFiles) > 0 {
-		return p.Config.ComposeFiles[0]
-	}
-	return ""
 }
 
 // Action 是可以在项目上执行的编排动作。
@@ -392,290 +76,322 @@ const (
 
 // ActionOptions 控制动作的额外参数。
 type ActionOptions struct {
-	// Detach 用于 up：-d
+	// Detach 用于 up：-d。界面只做后台启动，所以 up 总是分离模式；保留字段是为了与界面选项对应。
 	Detach bool
-	// Build 用于 up：--build
+	// Build 用于 up：--build，启动前重新构建镜像。
 	Build bool
-	// ForceRecreate 用于 up：--force-recreate
+	// ForceRecreate 用于 up：--force-recreate。
 	ForceRecreate bool
-	// Volumes 用于 down：-v
+	// Volumes 用于 down：-v，同时删除命名卷。
 	Volumes bool
+	// NoCache 用于 build：--no-cache。
+	NoCache bool
 	// Services 限定操作的服务；为空表示全部。
 	Services []string
+	// Profiles 启用的 profile；带 profile 的服务默认不启动。
+	Profiles []string
+	// Scale 覆盖服务的副本数（服务名 → 数量）。
+	Scale map[string]int
+	// Timeout 是停止容器时等待的秒数，0 表示用默认值 10。
+	Timeout int
+	// WaitTimeout 是等待每个 depends_on 条件的最长时间，0 不限。
+	WaitTimeout time.Duration
+	// ProjectName 覆盖项目名。
+	ProjectName string
+	// EnvFile 指定 .env 文件。
+	EnvFile string
+	// Files 显式指定 compose 文件（-f）；为空则在项目目录里自动探测。
+	Files []string
+}
+
+func (o ActionOptions) stopTimeout() int {
+	if o.Timeout > 0 {
+		return o.Timeout
+	}
+	return 10
+}
+
+// LoadProject 加载项目目录，返回界面用的项目视图。
+//
+// 只读文件，不碰 wslc，也不占用任何锁——项目列表刷新不会被正在运行的 up 挡住。
+func (c *Client) LoadProject(ctx context.Context, dir string) (Project, error) {
+	p, err := loadProject(ctx, LoadOptions{Dir: dir})
+	if err != nil {
+		return Project{}, err
+	}
+	warnings, err := checkProject(p)
+	if err != nil {
+		return Project{}, err
+	}
+	return projectView(p, dir, "", warnings), nil
+}
+
+// Load 按完整选项加载项目，返回 compose-go 的原始模型。
+// 供需要完整配置的调用方使用（命令行风格的 config 输出、测试）。
+func (c *Client) Load(ctx context.Context, o LoadOptions) (Project, error) {
+	p, err := loadProject(ctx, o)
+	if err != nil {
+		return Project{}, err
+	}
+	warnings, err := checkProject(p)
+	if err != nil {
+		return Project{}, err
+	}
+	return projectView(p, o.Dir, o.EnvFile, warnings), nil
+}
+
+// ConfigYAML 返回解析后的完整配置（YAML），等价于 `docker compose config`。
+func (c *Client) ConfigYAML(ctx context.Context, dir string, o ActionOptions) (string, error) {
+	p, err := loadProject(ctx, optsFor(dir, o))
+	if err != nil {
+		return "", err
+	}
+	if _, err := checkProject(p); err != nil {
+		return "", err
+	}
+	out, err := p.MarshalYAML()
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+func optsFor(dir string, o ActionOptions) LoadOptions {
+	return LoadOptions{Dir: dir, Files: o.Files, ProjectName: o.ProjectName, EnvFile: o.EnvFile}
 }
 
 // RunAction 在项目目录执行一个编排动作，返回合并后的输出。
 func (c *Client) RunAction(ctx context.Context, dir string, action Action, opt ActionOptions) Result {
-	args := actionArgs(action, opt)
-	res, err := c.run(ctx, dir, args...)
+	var lines []string
+	res, err := c.RunActionStream(ctx, dir, action, opt, func(l string) { lines = append(lines, l) })
 	if err != nil {
 		res.Stderr = strings.TrimSpace(res.Stderr + "\n" + err.Error())
 	}
 	return res
 }
 
-// actionArgs 把动作与选项翻译成 wslc-compose 的参数列表。
-//
-// 抽成纯函数是为了让 RunAction 与 RunActionStream 共用同一套参数逻辑，
-// 也便于对参数拼装单独写单元测试。
-func actionArgs(action Action, opt ActionOptions) []string {
-	args := []string{string(action)}
-	switch action {
-	case ActionUp:
-		if opt.Detach {
-			args = append(args, "-d")
-		}
-		if opt.Build {
-			args = append(args, "--build")
-		}
-		if opt.ForceRecreate {
-			args = append(args, "--force-recreate")
-		}
-	case ActionDown:
-		if opt.Volumes {
-			args = append(args, "-v")
-		}
-	default:
-		// start/stop/restart/pull/build 没有额外开关。
-	}
-	return append(args, opt.Services...)
-}
-
 // RunActionStream 执行编排动作，并把每一行输出实时交给 onLine。
 //
-// up / build / pull 都可能跑很久，界面上必须能看到进度，
-// 因此这里用流式读取而不是等命令结束。
+// up / build / pull 都可能跑很久，界面上必须能看到进度，所以逐行回调而不是等命令结束。
+// onLine 可能在后台 goroutine 里被调用，调用方需自行处理线程安全。
 //
-// onLine 在后台 goroutine 里被调用，调用方需自行处理线程安全。
+// 返回约定与原来的命令行封装一致：动作本身失败（容器起不来等）体现为 Result.ExitCode != 0，
+// error 只表示「没能开始」（例如超时之前就被取消）。
 func (c *Client) RunActionStream(ctx context.Context, dir string, action Action, opt ActionOptions, onLine func(string)) (Result, error) {
-	return c.runStream(ctx, dir, actionArgs(action, opt), onLine)
+	return c.execute(ctx, dir, action, opt, onLine, false)
 }
 
-// DryRun 执行带 --dry-run 的动作，返回将要运行的 wslc 命令。
-//
-// 用于「预览」：在不真正改动容器的情况下告诉用户会发生什么。
+// DryRun 预览 up 将要执行的 wslc 命令，不改动任何东西。
+// 查询类命令（list、inspect）照常执行，这样预览反映的是真实状态。
 func (c *Client) DryRun(ctx context.Context, dir string, action Action, opt ActionOptions) (string, error) {
-	args := []string{"--dry-run", string(action)}
-	switch action {
-	case ActionUp:
-		if opt.Detach {
-			args = append(args, "-d")
-		}
-		if opt.Build {
-			args = append(args, "--build")
-		}
-		if opt.ForceRecreate {
-			args = append(args, "--force-recreate")
-		}
-	case ActionDown:
-		if opt.Volumes {
-			args = append(args, "-v")
-		}
-	}
-	args = append(args, opt.Services...)
-
-	res, err := c.RunOK(ctx, dir, args...)
+	var mu sync.Mutex
+	var lines []string
+	res, err := c.execute(ctx, dir, action, opt, func(l string) {
+		mu.Lock()
+		lines = append(lines, l)
+		mu.Unlock()
+	}, true)
+	out := strings.Join(lines, "\n")
 	if err != nil {
-		return res.Combined(), err
+		return out, err
 	}
-	return res.Combined(), nil
+	return out, res.Error()
 }
 
-// PSEntry 是 `wslc-compose ps` 表格的一行。
-type PSEntry struct {
-	Name    string
-	Service string
-	Image   string
-	Status  string
-	Ports   string
-}
-
-// PS 返回项目当前的容器列表表格（解析成结构化数据）。
-func (c *Client) PS(ctx context.Context, dir string, all bool) ([]PSEntry, error) {
-	args := []string{"ps"}
-	if all {
-		args = append(args, "-a")
-	}
-	res, err := c.RunOK(ctx, dir, args...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePSTable(res.Stdout), nil
-}
-
-// ParsePSTable 解析 `wslc-compose ps` 的输出。
-//
-// 输出格式（表头行可能因终端宽度变化而列宽不同）：
-//
-//	NAME               SERVICE  IMAGE         STATUS   PORTS
-//	proj-db-1          db       postgres:16   running
-func ParsePSTable(out string) []PSEntry {
-	lines := strings.Split(strings.TrimSpace(out), "\n")
-	if len(lines) < 2 {
-		return nil
-	}
-	var entries []PSEntry
-	for _, line := range lines[1:] {
-		cols := splitColumns(line)
-		if len(cols) < 4 {
-			continue
-		}
-		e := PSEntry{
-			Name:    cols[0],
-			Service: cols[1],
-			Image:   cols[2],
-			Status:  cols[3],
-		}
-		if len(cols) > 4 {
-			e.Ports = strings.Join(cols[4:], " ")
-		}
-		entries = append(entries, e)
-	}
-	return entries
-}
-
-// splitColumns 按两个及以上空格切分表格行。
-func splitColumns(line string) []string {
-	var cols []string
-	var cur strings.Builder
-	spaces := 0
-	flush := func() {
-		if s := strings.TrimSpace(cur.String()); s != "" {
-			cols = append(cols, s)
-		}
-		cur.Reset()
-	}
-	for _, r := range line {
-		if r == ' ' || r == '\t' {
-			spaces++
-			if spaces == 1 {
-				cur.WriteRune(r)
-			}
-			continue
-		}
-		if spaces >= 2 {
-			flush()
-		}
-		spaces = 0
-		cur.WriteRune(r)
-	}
-	flush()
-	return cols
-}
-
-// Version 读取 wslc-compose 版本。
-func (c *Client) Version(ctx context.Context) (string, error) {
-	res, err := c.RunOK(ctx, "", "--version")
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(res.Stdout), nil
-}
-
-// ComposeFileNames 是 wslc-compose 会自动探测的文件名（按优先级）。
-var ComposeFileNames = []string{
-	"compose.yaml",
-	"compose.yml",
-	"docker-compose.yml",
-	"docker-compose.yaml",
-}
-
-// IsComposeDir 判断目录下是否有 compose 文件。
-func IsComposeDir(dir string) bool {
-	return FindComposeFile(dir) != ""
-}
-
-// FindComposeFile 返回目录中第一个匹配的 compose 文件名（完整路径）。
-func FindComposeFile(dir string) string {
-	for _, name := range ComposeFileNames {
-		p := filepath.Join(dir, name)
-		if st, err := os.Stat(p); err == nil && !st.IsDir() {
-			return p
-		}
-	}
-	return ""
-}
-
-// runStream 在指定目录执行 wslc-compose，并把每一行输出实时交给 onLine。
-//
-// 与 wslc.Client.RunStream 的思路一致：把 stdout 与 stderr 合并到同一个
-// 管道，读一行转一行。wslc-compose 的进度信息主要写在 stdout，
-// 但错误在 stderr，两者都转发才不会漏。
-func (c *Client) runStream(ctx context.Context, dir string, args []string, onLine func(string)) (Result, error) {
+// execute 是各个动作的统一入口：加载项目、应用超时、分发到具体动作、汇总结果。
+func (c *Client) execute(ctx context.Context, dir string, action Action, opt ActionOptions, onLine func(string), dryRun bool) (Result, error) {
 	start := time.Now()
-
-	c.mu.Lock()
-
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if c.timeout > 0 {
+	c.mu.Lock()
+	timeout := c.timeout
+	c.mu.Unlock()
+	if timeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.timeout)
+		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
 	}
 
-	cmd := exec.CommandContext(ctx, c.bin, args...)
-	cmd.Dir = dir
-	hideWindow(cmd)
-	cmd.Env = append(os.Environ(), "PYTHONIOENCODING=utf-8", "PYTHONUTF8=1")
-
-	pr, pw := io.Pipe()
-	cmd.Stdout = pw
-	cmd.Stderr = pw
-
-	if err := cmd.Start(); err != nil {
-		_ = pw.Close()
-		_ = pr.Close()
-		c.mu.Unlock()
-		res := Result{Args: args, ExitCode: -1, Duration: time.Since(start)}
-		c.callHook(res)
-		return res, fmt.Errorf("启动 wslc-compose 失败: %w", err)
-	}
-
 	var all strings.Builder
-	readDone := make(chan struct{})
-	go func() {
-		defer close(readDone)
-		scanner := bufio.NewScanner(pr)
-		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-		for scanner.Scan() {
-			line := scanner.Text()
-			all.WriteString(line)
-			all.WriteString("\n")
-			if onLine != nil {
-				onLine(line)
-			}
+	var outMu sync.Mutex
+	emit := func(line string) {
+		outMu.Lock()
+		all.WriteString(line)
+		all.WriteString("\n")
+		outMu.Unlock()
+		if onLine != nil {
+			onLine(line)
 		}
-		_ = pr.Close()
-	}()
-
-	waitErr := cmd.Wait()
-	_ = pw.Close()
-	<-readDone
-
-	res := Result{
-		Args:     args,
-		Stdout:   all.String(),
-		ExitCode: 0,
-		Duration: time.Since(start),
 	}
-	c.mu.Unlock()
-
-	if waitErr != nil {
-		var ee *exec.ExitError
-		if errors.As(waitErr, &ee) {
-			res.ExitCode = ee.ExitCode()
+	finish := func(err error) (Result, error) {
+		res := Result{Args: append([]string{string(action)}, opt.Services...), Duration: time.Since(start)}
+		outMu.Lock()
+		res.Stdout = all.String()
+		outMu.Unlock()
+		switch {
+		case err == nil:
+		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+			res.ExitCode = -1
+			res.Stderr = err.Error()
 			c.callHook(res)
-			return res, nil
-		}
-		res.ExitCode = -1
-		if ctx.Err() != nil {
-			res.Stderr = ctx.Err().Error()
+			return res, err
+		default:
+			res.ExitCode = 1
+			res.Stderr = err.Error()
+			// 与命令行一致：失败原因也作为最后一行输出，界面的输出面板里能直接看到。
+			emit("wslc-compose: " + err.Error())
+			res.Stdout = all.String()
 		}
 		c.callHook(res)
-		return res, fmt.Errorf("执行 wslc-compose %s 失败: %w", strings.Join(args, " "), waitErr)
+		return res, nil
 	}
-	c.callHook(res)
-	return res, nil
+
+	p, err := loadProject(ctx, optsFor(dir, opt))
+	if err != nil {
+		return finish(err)
+	}
+	warnings, err := checkProject(p)
+	if err != nil {
+		return finish(err)
+	}
+	for _, w := range warnings {
+		emit("wslc-compose: warning: " + w)
+	}
+
+	e := newEngine(c.rt, emit)
+	e.dryRun = dryRun
+	var runErr error
+	switch action {
+	case ActionUp:
+		runErr = e.up(ctx, p, upOptions{
+			Services: opt.Services, Profiles: opt.Profiles, Build: opt.Build, ForceRecreate: opt.ForceRecreate,
+			Scale: opt.Scale, StopTimeout: opt.stopTimeout(), WaitTimeout: opt.WaitTimeout, EnvFile: opt.EnvFile,
+		})
+	case ActionDown:
+		runErr = e.down(ctx, p, opt)
+	case ActionStart, ActionStop, ActionRestart:
+		runErr = e.lifecycle(ctx, p, action, opt)
+	case ActionPull:
+		runErr = e.pull(ctx, p, opt)
+	case ActionBuild:
+		runErr = e.build(ctx, p, opt)
+	default:
+		runErr = fmt.Errorf("action %q is not supported here", action)
+	}
+	return finish(runErr)
+}
+
+// PS 返回项目当前的容器列表（结构化数据，不再解析表格文本）。
+// all 为 false 时只列出运行中的容器。
+func (c *Client) PS(ctx context.Context, dir string, all bool) ([]PSEntry, error) {
+	p, err := loadProject(ctx, LoadOptions{Dir: dir})
+	if err != nil {
+		return nil, err
+	}
+	e := newEngine(c.rt, nil)
+	list, err := e.listProjectContainers(ctx, p.Name, all)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]PSEntry, 0, len(list))
+	for _, ct := range list {
+		out = append(out, PSEntry{
+			ID: ct.ID, Name: ct.Name, Service: ct.Service, Image: ct.Image, Command: ct.Command,
+			Created: ct.Created, Status: ct.Status, Ports: ct.Ports, Running: ct.Running,
+		})
+	}
+	return out, nil
+}
+
+// Version 返回内置引擎的版本说明。
+func (c *Client) Version(ctx context.Context) (string, error) {
+	return "wslc-compose " + Version + " (built-in)", nil
+}
+
+// Exec 在服务的容器里执行命令，返回合并输出。index 是副本序号（从 1 开始）。
+func (c *Client) Exec(ctx context.Context, dir, service string, index int, command []string) (string, error) {
+	if len(command) == 0 {
+		return "", errors.New("no command given")
+	}
+	p, err := loadProject(ctx, LoadOptions{Dir: dir})
+	if err != nil {
+		return "", err
+	}
+	s, ok := p.Services[service]
+	if !ok {
+		return "", fmt.Errorf("no such service: %s", service)
+	}
+	if index < 1 {
+		index = 1
+	}
+	res, err := c.rt.Run(ctx, append([]string{"exec", containerName(p, s, index)}, command...)...)
+	if err != nil {
+		return res.Combined(), err
+	}
+	return res.Combined(), res.Error()
+}
+
+// Logs 读取项目内各服务的日志，每行加上容器名前缀；包括已停止或崩溃的容器，那正是日志最有用的时候。
+// follow 为 true 时持续输出直到 ctx 被取消。
+func (c *Client) Logs(ctx context.Context, dir string, services []string, follow bool, tail int, timestamps bool, onLine func(string)) error {
+	p, err := loadProject(ctx, LoadOptions{Dir: dir})
+	if err != nil {
+		return err
+	}
+	e := newEngine(c.rt, nil)
+	list, err := e.listProjectContainers(ctx, p.Name, true)
+	if err != nil {
+		return err
+	}
+	var picked []container
+	for _, ct := range list {
+		if len(services) == 0 || contains(services, ct.Service) {
+			picked = append(picked, ct)
+		}
+	}
+	if len(picked) == 0 {
+		return errors.New("no containers found")
+	}
+	width := 0
+	for _, ct := range picked {
+		if len(ct.Name) > width {
+			width = len(ct.Name)
+		}
+	}
+
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var firstErr error
+	for _, ct := range picked {
+		args := []string{"logs"}
+		if follow && ct.Running {
+			args = append(args, "-f")
+		}
+		if tail > 0 {
+			args = append(args, "-n", strconv.Itoa(tail))
+		}
+		if timestamps {
+			args = append(args, "-t")
+		}
+		args = append(args, ct.Name)
+		prefix := fmt.Sprintf("%-*s | ", width, ct.Name)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			// 用 Follow：不占串行锁，否则一条没结束的 `logs -f` 会堵死之后所有命令。
+			res, err := c.rt.Follow(ctx, func(line string) { onLine(prefix + line) }, args...)
+			mu.Lock()
+			defer mu.Unlock()
+			if firstErr == nil && ctx.Err() == nil {
+				if err != nil {
+					firstErr = err
+				} else if !res.Ok() {
+					firstErr = res.Error()
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	return firstErr
 }

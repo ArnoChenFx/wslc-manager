@@ -8,6 +8,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
+	"github.com/arno/wslc-manager/internal/compose"
 	"github.com/arno/wslc-manager/locales"
 )
 
@@ -43,7 +44,7 @@ func (a *App) systemPage(c *ui.Context) {
 					a.infoRow(c, locales.SystemWslcPath(), a.wslc.Binary())
 				}
 				if a.compose != nil {
-					a.infoRow(c, locales.SystemComposePath(), a.compose.Binary())
+					a.infoRow(c, locales.SystemComposePath(), locales.CommonBuiltin()+" "+compose.Version)
 				}
 				if a.store != nil {
 					a.infoRow(c, locales.SettingsSettingsFile(), a.store.Path())

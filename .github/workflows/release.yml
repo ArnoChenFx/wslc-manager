@@ -219,15 +219,14 @@ jobs:
 
             **Requirements**
             - Windows 10/11 with WSL (`winget install Microsoft.WSL`)
-            - `wslc-compose` (`uv tool install wslc-compose`)
 
-            Both are checked on the **System** page, which can install or upgrade them for you.
+            It is checked on the **System** page, which can install or update WSL for you. Compose is built in.
 
             **Highlights**
             - Containers: start, stop, restart, remove, live stats and streaming logs
             - Images: pull with live progress, browse tags, update one or all
             - Volumes and networks: create, inspect, delete
-            - Compose projects: full stack control through `wslc-compose`
+            - Compose projects: built-in orchestration (start, stop, rebuild, dependency waits, dry-run preview)
             - Chinese and English UI, switchable in Settings
             - Six accent colors
             - Diagnostic reports with versions, element coordinates and recent logs

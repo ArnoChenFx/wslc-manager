@@ -334,27 +334,33 @@ func (a *App) Init() {
 		})
 	}
 
-	if c, err := compose.New(); err != nil {
-		a.composeErr = err.Error()
-		a.logError("compose", "定位 wslc-compose 失败: %v", err)
-	} else {
-		a.compose = c
-		a.composeStream = c.RunActionStream
-		a.logInfo("compose", "可执行文件: %s", c.Binary())
-		c.SetRunHook(func(r compose.Result) {
-			src := "compose"
-			if !r.Ok() {
-				a.logError(src, "%s → 退出码 %d（%s）",
-					strings.Join(r.Args, " "), r.ExitCode, r.Duration.Round(time.Millisecond))
-				if msg := strings.TrimSpace(r.Stderr); msg != "" {
-					a.logError(src, "  stderr: %s", firstLine(msg))
-				}
-			} else {
-				a.logDebug(src, "%s → 0（%s）",
-					strings.Join(r.Args, " "), r.Duration.Round(time.Millisecond))
-			}
-		})
+	// Compose 引擎是内置的，不再需要定位外部可执行文件；它唯一的前提是 wslc 可用，
+	// 所有命令都经 wslc 客户端发出（共用同一把串行锁）。
+	// wslc 找不到时，Compose 页展示的就是 wslc 缺失的错误。
+	if a.wslc == nil {
+		a.composeErr = a.wslcErr
+		a.logError("compose", "Compose 引擎不可用：wslc 不可用")
+		return
 	}
+	c := compose.New(composeRuntime{c: a.wslc})
+	a.compose = c
+	a.composeStream = c.RunActionStream
+	a.logInfo("compose", "内置引擎 %s", compose.Version)
+	// 每个编排动作结束后记一行：动作、退出码、耗时。
+	// 具体执行了哪些 wslc 命令，由 wslc 客户端的命令日志记录（上面的 SetRunHook）。
+	c.SetRunHook(func(r compose.Result) {
+		src := "compose"
+		if !r.Ok() {
+			a.logError(src, "%s → 退出码 %d（%s）",
+				strings.Join(r.Args, " "), r.ExitCode, r.Duration.Round(time.Millisecond))
+			if msg := strings.TrimSpace(r.Stderr); msg != "" {
+				a.logError(src, "  stderr: %s", firstLine(msg))
+			}
+		} else {
+			a.logDebug(src, "%s → 0（%s）",
+				strings.Join(r.Args, " "), r.Duration.Round(time.Millisecond))
+		}
+	})
 }
 
 // AttachWindow 绑定主窗口，之后后台任务才能把结果送回主线程。

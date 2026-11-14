@@ -29,19 +29,15 @@ func newTestApp(t *testing.T) *App {
 	// 固定依赖环境状态，别让测试去探本机。
 	//
 	// 两个原因：
-	//   1. 检测会启动后台命令（wsl.exe / uv），测试不该碰真实环境；
+	//   1. 检测会启动后台命令（wsl.exe），测试不该碰真实环境；
 	//   2. 检测结果异步回填会改变系统页卡片高度，
 	//      测量类断言会因此随机失败（CI 上就真的踩到过：
 	//      同一份代码本地过、CI 报「最后一行高度为 0」）。
 	a.envChecked = true
 	a.env = envsetup.Status{
-		WSLCPath:       `C:\Program Files\WSL\wslc.exe`,
-		WSLVersion:     "3.0.5.0",
-		ComposePath:    `C:\tools\wslc-compose.exe`,
-		ComposeVersion: "0.6.0",
-		Latest:         "0.6.0",
-		Upgrader:       "uv",
-		CheckedAt:      time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+		WSLCPath:   `C:\Program Files\WSL\wslc.exe`,
+		WSLVersion: "3.0.5.0",
+		CheckedAt:  time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 	}
 	return a
 }
@@ -77,7 +73,7 @@ func sampleData(a *App) {
 	}
 	a.sessions = []wslc.Session{{ID: "1", PID: "57024", DisplayName: "wslc-cli-test"}}
 	a.wslcVer = "wslc test-1"
-	a.composeVer = "wslc-compose 0.6.0"
+	a.composeVer = "wslc-compose 1.0.0 (built-in)"
 	a.projects = []compose.Project{
 		{
 			Dir:  `E:\Project\demo`,
@@ -277,7 +273,7 @@ func TestViewWslcMissing(t *testing.T) {
 
 func TestViewComposeMissing(t *testing.T) {
 	a := newTestApp(t)
-	a.composeErr = "找不到 wslc-compose"
+	a.composeErr = "找不到 wslc"
 	a.page = PageCompose
 
 	tt := frame(t, a)
@@ -937,12 +933,13 @@ func (a *App) viewForLocale(c *ui.Context, locale string) {
 	a.View(c)
 }
 
-// TestSystemPageStableWithoutCompose 验证缺少 wslc-compose 时系统页布局稳定。
+// TestSystemPageStableWithoutCompose 验证依赖缺失（没有 wslc，Compose 引擎随之不可用）时系统页布局稳定。
 //
 // 回归测试：CI 曾报「最后一行高度为 0」，同一份代码本地却是好的。
 // 根因是视图里发起了依赖检测——检测结果异步回填会改变卡片高度，
-// 渲染中途布局变化，测量结果就不稳定。CI 机器上没有 wslc-compose，
+// 渲染中途布局变化，测量结果就不稳定。CI 机器上没有装依赖，
 // 检测走的路径不同、耗时更长，于是必然撞上。
+// （当时缺的是 wslc-compose；它现在内置了，CI 上缺的变成 wslc，原理相同。）
 //
 // 现在检测移到 Init，newTestApp 显式固定环境状态，视图彻底不碰 IO。
 func TestSystemPageStableWithoutCompose(t *testing.T) {
@@ -950,12 +947,11 @@ func TestSystemPageStableWithoutCompose(t *testing.T) {
 	sampleData(a)
 	a.page = PageSystem
 
-	// 缺少 compose 的场景：卡片内容与完全就绪时不同。
+	// 依赖缺失的场景：卡片内容与完全就绪时不同。
 	a.compose = nil
-	a.composeErr = "wslc-compose 未找到"
-	a.env.ComposePath = ""
-	a.env.ComposeVersion = ""
-	a.env.Upgrader = ""
+	a.composeErr = "找不到 wslc"
+	a.env.WSLCPath = ""
+	a.env.WSLVersion = ""
 
 	const W, H = 1180, 760
 	tt := ui.NewTester(a.View, W, H)

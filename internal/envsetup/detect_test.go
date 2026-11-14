@@ -3,54 +3,8 @@ package envsetup
 import (
 	"context"
 	"testing"
-	"time"
+	"unicode/utf16"
 )
-
-// TestCompareVersions 覆盖版本比较的边界。
-//
-// 这段逻辑决定「有新版本」按钮是否出现，比错会误导用户：
-// 把旧版说成最新，或一直提示已是最新。
-func TestCompareVersions(t *testing.T) {
-	cases := []struct {
-		a, b string
-		want int
-	}{
-		{"0.6.0", "0.6.0", 0},
-		{"0.6.0", "0.7.0", -1},
-		{"0.7.0", "0.6.0", 1},
-		{"0.6.0", "0.6.1", -1},
-		{"1.0", "0.9.9", 1},
-		// 段数不同：缺的段按 0 算
-		{"1.0", "1.0.0", 0},
-		{"1.0.1", "1.0", 1},
-		// 预发布后缀按数字前缀比较，方向仍然正确
-		{"0.6.0", "0.7.0rc1", -1},
-		{"0.7.0rc1", "0.7.0", 0},
-		// 非数字段按 0
-		{"abc", "0.0.0", 0},
-	}
-	for _, c := range cases {
-		if got := compareVersions(c.a, c.b); got != c.want {
-			t.Errorf("compareVersions(%q, %q) = %d, 期望 %d", c.a, c.b, got, c.want)
-		}
-	}
-}
-
-// TestFirstVersion 从命令行输出里取版本号。
-func TestFirstVersion(t *testing.T) {
-	cases := []struct{ in, want string }{
-		{"wslc-compose 0.6.0\n", "0.6.0"},
-		{"wslc-compose version 1.2.3", "1.2.3"},
-		{"v2.0", "2.0"},
-		{"no version here", ""},
-		{"", ""},
-	}
-	for _, c := range cases {
-		if got := firstVersion(c.in); got != c.want {
-			t.Errorf("firstVersion(%q) = %q, 期望 %q", c.in, got, c.want)
-		}
-	}
-}
 
 // TestLooksLikeVersion 判断版本号形态。
 func TestLooksLikeVersion(t *testing.T) {
@@ -66,105 +20,45 @@ func TestLooksLikeVersion(t *testing.T) {
 	}
 }
 
-// TestComposeOutdated 检查「有新版本」的判定。
+// TestWingetArgShapes 检查 winget 命令的形状：必须静默、必须精确匹配包 ID。
 //
-// 关键点：任一边拿不到版本时不报「有更新」，否则会诱导用户
-// 去升级一个其实已经最新的东西。
-func TestComposeOutdated(t *testing.T) {
-	cases := []struct {
-		name          string
-		local, latest string
-		want          bool
-	}{
-		{"落后", "0.6.0", "0.7.0", true},
-		{"相同", "0.6.0", "0.6.0", false},
-		{"本地更新", "0.8.0", "0.7.0", false},
-		{"本地未知", "", "0.7.0", false},
-		{"远端未知", "0.6.0", "", false},
-		{"都未知", "", "", false},
-	}
-	for _, c := range cases {
-		st := Status{ComposeVersion: c.local, Latest: c.latest}
-		if got := st.ComposeOutdated(); got != c.want {
-			t.Errorf("%s: ComposeOutdated() = %v, 期望 %v", c.name, got, c.want)
-		}
-	}
-}
-
-// TestInstallArgShapes 检查四种安装/升级命令的形态。
-//
-// 这些命令会被真的执行，参数写错会在用户机器上装错东西，
-// 所以逐项断言，而不是只测「非空」。
-func TestInstallArgShapes(t *testing.T) {
-	t.Run("uv 安装用固定版本", func(t *testing.T) {
-		st := Status{Upgrader: "uv", Latest: "0.7.0"}
-		bin, args := st.InstallComposeArgs()
-		if bin != "uv" {
-			t.Fatalf("bin = %q", bin)
-		}
-		want := []string{"tool", "install", "wslc-compose==0.7.0"}
-		if len(args) != len(want) {
-			t.Fatalf("args = %v", args)
-		}
-		for i := range want {
-			if args[i] != want[i] {
-				t.Errorf("args[%d] = %q, 期望 %q", i, args[i], want[i])
-			}
-		}
-	})
-
-	t.Run("uv 升级不带版本", func(t *testing.T) {
-		st := Status{Upgrader: "uv"}
-		_, args := st.UpgradeComposeArgs()
-		if len(args) != 3 || args[2] != "wslc-compose" {
-			t.Errorf("args = %v", args)
-		}
-	})
-
-	t.Run("pipx 安装", func(t *testing.T) {
-		st := Status{Upgrader: "pipx", Latest: "0.7.0"}
-		bin, args := st.InstallComposeArgs()
-		if bin != "pipx" || len(args) != 2 || args[0] != "install" {
-			t.Errorf("bin = %q, args = %v", bin, args)
-		}
-	})
-
-	t.Run("没有安装器时返回空", func(t *testing.T) {
-		st := Status{}
-		if bin, args := st.InstallComposeArgs(); bin != "" || args != nil {
-			t.Errorf("期望空, got %q %v", bin, args)
-		}
-		if bin, args := st.UpgradeComposeArgs(); bin != "" || args != nil {
-			t.Errorf("期望空, got %q %v", bin, args)
-		}
-	})
-
-	t.Run("winget 安装 WSL 带静默参数", func(t *testing.T) {
-		st := Status{Winget: `C:\winget.exe`}
-		bin, args := st.InstallWSLArgs()
+// 不带 --accept-* 的话安装会卡在交互式协议确认上，界面上看起来就是「点了没反应」；
+// 不带 --exact 的话 winget 会按模糊匹配，可能装错包。
+func TestWingetArgShapes(t *testing.T) {
+	st := Status{Winget: `C:\winget.exe`}
+	for name, build := range map[string]func() (string, []string){
+		"安装": st.InstallWSLArgs,
+		"更新": st.UpgradeWSLArgs,
+	} {
+		bin, args := build()
 		if bin != st.Winget {
-			t.Errorf("bin = %q", bin)
+			t.Errorf("%s：bin = %q", name, bin)
 		}
-		joined := ""
-		for _, a := range args {
-			joined += a + " "
-		}
-		for _, want := range []string{"install", "Microsoft.WSL", "--exact", "--silent"} {
+		for _, want := range []string{"Microsoft.WSL", "--exact", "--silent", "--accept-package-agreements", "--accept-source-agreements"} {
 			if !containsArg(args, want) {
-				t.Errorf("缺少参数 %q，实际 %q", want, joined)
+				t.Errorf("%s：缺少参数 %q，实际 %v", name, want, args)
 			}
 		}
-	})
+	}
+	_, installArgs := st.InstallWSLArgs()
+	_, upgradeArgs := st.UpgradeWSLArgs()
+	if !containsArg(installArgs, "install") || !containsArg(upgradeArgs, "upgrade") {
+		t.Error("子命令不对：应分别是 install 与 upgrade")
+	}
 
-	t.Run("没有 winget 时不返回命令", func(t *testing.T) {
-		st := Status{}
-		if bin, args := st.InstallWSLArgs(); bin != "" || args != nil {
-			t.Errorf("期望空, got %q %v", bin, args)
-		}
-	})
+	// 没有 winget 时不返回命令，而不是返回一个空的 bin。
+	empty := Status{}
+	if bin, args := empty.InstallWSLArgs(); bin != "" || args != nil {
+		t.Errorf("期望空, got %q %v", bin, args)
+	}
+	if bin, args := empty.UpgradeWSLArgs(); bin != "" || args != nil {
+		t.Errorf("期望空, got %q %v", bin, args)
+	}
+	if empty.CanInstallWSL() || !st.CanInstallWSL() {
+		t.Error("CanInstallWSL 应取决于是否找到 winget")
+	}
 }
 
-// containsArg 判断参数列表里是否有某个值。
 func containsArg(args []string, want string) bool {
 	for _, a := range args {
 		if a == want {
@@ -174,61 +68,50 @@ func containsArg(args []string, want string) bool {
 	return false
 }
 
+// TestDecodeUTF16LE 覆盖 wsl.exe 输出的解码。
+//
+// 回归测试：`wsl.exe --version` 输出 UTF-16LE。早先按 UTF-8 读，得到夹杂 NUL 的乱码，
+// 解析版本号永远匹配不上，系统页的 WSL 版本一直是空的。
+func TestDecodeUTF16LE(t *testing.T) {
+	encode := func(s string) []byte {
+		var b []byte
+		for _, u := range utf16.Encode([]rune(s)) {
+			b = append(b, byte(u), byte(u>>8))
+		}
+		return b
+	}
+	tests := []struct {
+		name string
+		in   []byte
+		want string
+	}{
+		{"英文", encode("WSL version: 3.0.5.0\r\n"), "WSL version: 3.0.5.0\r\n"},
+		{"中文", encode("WSL 版本: 3.0.5.0"), "WSL 版本: 3.0.5.0"},
+		{"UTF-8 原样返回", []byte("plain utf-8 文本"), "plain utf-8 文本"},
+		{"空", nil, ""},
+		{"一个字节", []byte("x"), "x"},
+	}
+	for _, tc := range tests {
+		if got := decodeUTF16LE(tc.in); got != tc.want {
+			t.Errorf("%s：got %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
 // TestDetectRuns 在真实的开发机上跑一次检测。
 //
 // 它只读、不写系统，所以可以安全地作为常规测试；但结果依赖机器环境，
 // 因此只断言「不 panic 且基本结构合理」，不断言具体路径。
 func TestDetectRuns(t *testing.T) {
 	st := Detect(context.Background())
-
 	if st.CheckedAt.IsZero() {
 		t.Error("CheckedAt 未设置")
 	}
-	// 找到路径时，版本号要么是空（取不到），要么形如版本。
-	if st.ComposePath != "" && st.ComposeVersion != "" && !looksLikeVersion(st.ComposeVersion) {
-		t.Errorf("ComposeVersion 形态异常: %q", st.ComposeVersion)
+	if st.WSLCPath == "" && st.WSLVersion != "" {
+		t.Errorf("没找到 wslc 时不应去读 WSL 版本，got %q", st.WSLVersion)
 	}
-	// Upgrader 只允许这三种取值。
-	switch st.Upgrader {
-	case "", "uv", "pipx":
-	default:
-		t.Errorf("Upgrader 取值异常: %q", st.Upgrader)
+	if st.WSLVersion != "" && !looksLikeVersion(st.WSLVersion) {
+		t.Errorf("WSLVersion 形态异常: %q", st.WSLVersion)
 	}
-	t.Logf("wslc=%q (WSL %s) compose=%q (%s) latest=%q upgrader=%q winget=%v",
-		st.WSLCPath, st.WSLVersion, st.ComposePath, st.ComposeVersion,
-		st.Latest, st.Upgrader, st.Winget != "")
-}
-
-// TestDetectIsLocalOnly 确认 Detect 不访问网络。
-//
-// 回归测试：PyPI 查询曾经在 Detect 里同步执行，于是启动时要多等
-// 1 秒以上（实测 2.07s），而且断网时还会更久。
-// 现在 Detect 只做本地检查，网络查询拆到 DetectOnline。
-//
-// 断言方式：Detect 的结果里 Latest 必须为空——
-// 只要它非空，就说明又有人在 Detect 里联网了。
-func TestDetectIsLocalOnly(t *testing.T) {
-	st := Detect(context.Background())
-
-	if st.Latest != "" {
-		t.Errorf("Detect 不应查询网络，但 Latest=%q 非空", st.Latest)
-	}
-	if st.CheckedAt.IsZero() {
-		t.Error("CheckedAt 未设置")
-	}
-}
-
-// TestDetectOnlineFillsLatest 确认网络查询单独调用时才生效。
-func TestDetectOnlineFillsLatest(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	st := DetectOnline(ctx, Detect(ctx))
-	if st.Err != "" {
-		t.Skipf("网络不可用，跳过：%s", st.Err)
-	}
-	if st.Latest == "" {
-		t.Error("DetectOnline 应填入 PyPI 上的最新版本")
-	}
-	t.Logf("最新版本: %s", st.Latest)
+	t.Logf("wslc=%q (WSL %s) winget=%v", st.WSLCPath, st.WSLVersion, st.Winget != "")
 }

@@ -216,7 +216,7 @@
   "composeClosePanel": "关闭面板",
   "systemVersion": "程序版本",
   "systemWslcPath": "wslc 路径",
-  "systemComposePath": "wslc-compose 路径",
+  "systemComposePath": "wslc-compose 引擎",
   "systemWslcSettings": "wslc 设置",
   "systemWslVersion": "WSL 版本",
   "systemKernelVersion": "内核版本",
@@ -1041,28 +1041,7 @@
   "envUpdateWSL": "更新 WSL",
   "envUpdateWSLConfirm": "将用 winget 更新 WSL。更新期间正在运行的容器可能被停止，完成后通常需要重启终端。继续？",
   "envNoWinget": "没有找到 winget：请从 Microsoft Store 安装「应用安装程序」，或手动安装 WSL。",
-  "envOutdated": "有新版本可用：{current} → {latest}",
-  "@envOutdated": {
-    "placeholders": {
-      "current": {
-        "type": "String"
-      },
-      "latest": {
-        "type": "String"
-      }
-    }
-  },
-  "envInstallCompose": "安装 wslc-compose",
-  "envInstallComposeVersion": "安装 wslc-compose {version}",
-  "@envInstallComposeVersion": {
-    "placeholders": {
-      "version": {
-        "type": "String"
-      }
-    }
-  },
-  "envUpgradeCompose": "升级 wslc-compose",
-  "envNoUpgrader": "没有找到 uv 或 pipx。请先安装其中之一，才能一键安装 wslc-compose。",
+  "envNeedsWslc": "需要先安装 wslc",
   "envInstalling": "安装 · {tool}",
   "@envInstalling": {
     "placeholders": {

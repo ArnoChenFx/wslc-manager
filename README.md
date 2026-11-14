@@ -30,10 +30,14 @@ Create, inspect and delete named volumes and networks. Built-in networks are pro
 ### Compose projects
 Point the app at a directory containing `compose.yaml` (or `docker-compose.yml`) and it manages the whole stack: start, stop, restart, build, pull, remove, and per-service control.
 
-Compose files are **never parsed by this app**. Every action goes through [`wslc-compose`](https://github.com/bacarndiaye/wslc-compose) and asks it for the resolved configuration. Variable interpolation, `.env` files, includes and volume-name rewriting behave exactly as they will at runtime — what you see is what runs.
+Orchestration is **built in** — there is no extra tool to install. Compose files are read by [compose-go](https://github.com/compose-spec/compose-go), the same library `docker compose` uses, so variable interpolation, `.env` files, `include`, `extends`, multiple `-f` files and profiles follow the Compose specification. The app and the actions it runs share one loader, so what you see is what runs.
+
+Supported: `up` / `down` / `start` / `stop` / `restart` / `pull` / `build`, `depends_on` conditions (`service_healthy`, `service_completed_successfully`), health checks, multiple networks with aliases and static IPs, secrets and configs (file-backed), `scale`, and a dry-run preview. A service that fails to start does not stop the others; only the services that depend on it are skipped.
+
+Settings that `wslc` cannot honour (`privileged`, `devices`, `sysctls`, restart policies other than `always` / `no`, …) are reported as warnings and ignored; usages that would silently misbehave (anonymous volumes, external or non-file secrets, IPv6 networks) are rejected before anything is created.
 
 ### System
-Environment versions, WSL sessions, and a one-click dependency check that can install or upgrade what is missing.
+Environment versions, WSL sessions, and a one-click check that can install or update WSL when `wslc` is missing.
 
 ### Updates
 The app checks this repository's releases shortly after launch and then once a day, and offers a new version in a small window: **Install Update**, **Remind Me Later** or **Skip This Version**. Updates are signed: the app verifies the signature against a public key built into it before it replaces itself, and downloads only what changed when it can. Check by hand on the **System** page, or switch automatic checks and automatic installs off in **Settings**. The check contacts `github.com`.
@@ -41,7 +45,7 @@ The app checks this repository's releases shortly after launch and then once a d
 Self-updating needs a copy that can write to its own folder. The installer's per-user install and a portable copy in an ordinary folder qualify; a copy under `Program Files` does not, and the System page says so.
 
 ### Diagnostics
-Found a layout glitch or a button that does nothing? Export a diagnostic report: versions, the exact on-screen coordinates of every element, and recent command and error logs — in one Markdown file. There is also a live runtime log that records every `wslc` / `wslc-compose` invocation.
+Found a layout glitch or a button that does nothing? Export a diagnostic report: versions, the exact on-screen coordinates of every element, and recent command and error logs — in one Markdown file. There is also a live runtime log that records every `wslc` invocation.
 
 ### Two languages
 Chinese and English, switchable in Settings. The choice is remembered.
@@ -54,11 +58,8 @@ Chinese and English, switchable in Settings. The choice is remembered.
 |---|---|---|
 | **Windows 10/11** | — | — |
 | **WSL** with container support | Provides `wslc.exe` | `winget install Microsoft.WSL`, or `wsl --update` |
-| **wslc-compose** | Compose orchestration (third-party, Python) | `uv tool install wslc-compose` or `pipx install wslc-compose` |
 
-The app checks both on the **System** page and can install or upgrade them for you when `winget` and `uv`/`pipx` are available. `wslc` ships with WSL, so the app never downloads it separately — it updates WSL instead.
-
-> `wslc-compose` is a separate open-source project. This app depends on it rather than reimplementing Compose, so behavior always matches the real tool.
+That is the only dependency. The app checks it on the **System** page and, when `winget` is available, can install or update WSL for you. `wslc` ships with WSL, so the app never downloads it separately. Compose is built in, so there is nothing else to install.
 
 ---
 
@@ -110,7 +111,7 @@ If something is missing, the **System** page tells you which dependency is absen
 
 - **[Go](https://go.dev)** — single static binary, no runtime to install.
 - **[MyGo](https://github.com/egoist/mygo)** — native desktop UI in pure Go. Layout, theming, widgets, native file dialogs and the platform window are all provided by it. No HTML, no JavaScript, no bundled browser.
-- **[wslc-compose](https://github.com/bacarndiaye/wslc-compose)** — Compose orchestration, invoked as an external command.
+- **[compose-go](https://github.com/compose-spec/compose-go)** — reads and normalises Compose files (the library behind `docker compose`). The `wslc` orchestration on top of it is this repository's own `internal/compose` package.
 
 ---
 
