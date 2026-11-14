@@ -441,7 +441,7 @@ func (a *App) outputPanel(c *ui.Context) {
 		// 用户看到的正是最后一行只露出一半。
 		//
 		// 每行一个 Text 后，内容高度就是各行之和，滚动上限自然准确。
-		ui.Scroll(c).Grow(1).TrackScroll(sc).Children(func() {
+		ui.Scroll(c).Grow(1).Shrink(1).TrackScroll(sc).Children(func() {
 			ui.Column(c).FillWidth().Padding(8, 12).Gap(0).Children(func() {
 				for _, line := range splitLines(a.outputText) {
 					ui.Text(c, line).FontSize(12).Font("Consolas").

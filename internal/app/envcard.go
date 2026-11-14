@@ -147,18 +147,34 @@ func (a *App) detectEnvironment() {
 	a.logInfo("env", "开始检测依赖环境")
 
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		// 第一步：只看本机装了什么。纯本地、几十毫秒完成，
+		// 界面马上就能显示「wslc / wslc-compose 是否就绪」。
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
 		st := envsetup.Detect(ctx)
 
 		a.update(func() {
 			a.env = st
 			a.envChecked = true
+			a.logInfo("env", "本地检测完成: wslc=%v compose=%v upgrader=%s",
+				st.WSLCOK(), st.ComposeOK(), st.Upgrader)
+		})
+
+		// 第二步：问 PyPI 有没有新版本。
+		//
+		// 单独一步是因为它要走网络（实测 1 秒以上，还依赖网络状况）。
+		// 放在启动路径上会明显拖慢「窗口打开后能用」的时间，
+		// 而「要不要升级」并不急。
+		late := envsetup.DetectOnline(ctx, st)
+		a.update(func() {
+			a.env.Latest = late.Latest
+			a.env.Err = late.Err
 			a.setBusy("env-detect", false)
-			a.logInfo("env", "检测完成: wslc=%v compose=%v latest=%s upgrader=%s",
-				st.WSLCOK(), st.ComposeOK(), st.Latest, st.Upgrader)
-			if st.Err != "" {
-				a.logWarn("env", "检测提示: %s", st.Err)
+			if late.Latest != "" {
+				a.logInfo("env", "PyPI 最新版: %s", late.Latest)
+			}
+			if late.Err != "" {
+				a.logWarn("env", "查询更新失败: %s", late.Err)
 			}
 		})
 	}()

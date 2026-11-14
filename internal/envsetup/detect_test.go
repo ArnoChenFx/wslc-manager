@@ -3,6 +3,7 @@ package envsetup
 import (
 	"context"
 	"testing"
+	"time"
 )
 
 // TestCompareVersions 覆盖版本比较的边界。
@@ -196,4 +197,38 @@ func TestDetectRuns(t *testing.T) {
 	t.Logf("wslc=%q (WSL %s) compose=%q (%s) latest=%q upgrader=%q winget=%v",
 		st.WSLCPath, st.WSLVersion, st.ComposePath, st.ComposeVersion,
 		st.Latest, st.Upgrader, st.Winget != "")
+}
+
+// TestDetectIsLocalOnly 确认 Detect 不访问网络。
+//
+// 回归测试：PyPI 查询曾经在 Detect 里同步执行，于是启动时要多等
+// 1 秒以上（实测 2.07s），而且断网时还会更久。
+// 现在 Detect 只做本地检查，网络查询拆到 DetectOnline。
+//
+// 断言方式：Detect 的结果里 Latest 必须为空——
+// 只要它非空，就说明又有人在 Detect 里联网了。
+func TestDetectIsLocalOnly(t *testing.T) {
+	st := Detect(context.Background())
+
+	if st.Latest != "" {
+		t.Errorf("Detect 不应查询网络，但 Latest=%q 非空", st.Latest)
+	}
+	if st.CheckedAt.IsZero() {
+		t.Error("CheckedAt 未设置")
+	}
+}
+
+// TestDetectOnlineFillsLatest 确认网络查询单独调用时才生效。
+func TestDetectOnlineFillsLatest(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	st := DetectOnline(ctx, Detect(ctx))
+	if st.Err != "" {
+		t.Skipf("网络不可用，跳过：%s", st.Err)
+	}
+	if st.Latest == "" {
+		t.Error("DetectOnline 应填入 PyPI 上的最新版本")
+	}
+	t.Logf("最新版本: %s", st.Latest)
 }

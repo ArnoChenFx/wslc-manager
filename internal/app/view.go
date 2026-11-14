@@ -35,11 +35,16 @@ func (a *App) View(c *ui.Context) {
 		ui.Divider(c)
 		// 用 Split 做左右分栏：引擎自带可拖动的分隔条，
 		// 用户能直接拉宽/收窄侧边栏，并把宽度持久化到设置里。
+		// 用 Grow(1) 而不是 Fill：Fill 会让这一栏按「整个窗口高度」
+		// 去算，把上面工具栏和下面状态栏的高度也算进去，
+		// 结果内部再套 SplitVerticalPercent 时可用高度被高估 82px，
+		// 下半栏的面板与滚动条被排到窗口之外（实测 Scroll 底部 814 > 760）。
+		// Grow(1) 只取「剩余」高度，才是正确的约束。
 		ui.Split(c, &a.sidebarW, func() {
 			a.sidebar(c)
 		}, func() {
 			a.content(c)
-		}).SplitReset(220).Fill()
+		}).SplitReset(220).Grow(1)
 		ui.Divider(c)
 		a.statusBar(c)
 	})

@@ -102,11 +102,11 @@ func Detect(ctx context.Context) Status {
 	st.Upgrader = findUpgrader()
 	st.Winget = findWinget()
 
-	if v, err := latestOnPyPI(ctx); err != nil {
-		st.Err = err.Error()
-	} else {
-		st.Latest = v
-	}
+	// 网络查询单独一步（DetectOnline），不在这里做。
+	//
+	// 原因：PyPI 请求在启动路径上要花 1 秒以上，而界面启动时
+	// 只需要知道「本机装了什么」——是否需要升级可以稍后再问。
+	// Detect 因此只做本地检查，通常在几十毫秒内完成。
 	return st
 }
 
@@ -281,8 +281,22 @@ func findWinget() string {
 }
 
 // latestOnPyPI 查询 PyPI 上的最新版本号。
+// DetectOnline 查询 PyPI 上的最新版本，填入 s.Latest。
+//
+// 与 Detect 分开是因为它要走网络：慢且可能失败。
+// 调用方可以在界面已经显示之后再执行它，避免拖慢启动。
+func DetectOnline(ctx context.Context, st Status) Status {
+	v, err := latestOnPyPI(ctx)
+	if err != nil {
+		st.Err = err.Error()
+		return st
+	}
+	st.Latest = v
+	return st
+}
+
 func latestOnPyPI(ctx context.Context) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, PyPIURL, nil)
