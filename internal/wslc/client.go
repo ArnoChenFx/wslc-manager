@@ -160,6 +160,22 @@ func (r Result) Combined() string {
 	return out + r.Stderr
 }
 
+// withTimeout 给 ctx 套上默认超时，但**调用方已经设了 deadline 就尊重它**。
+//
+// 为什么：默认的 60 秒是给 list / inspect 这类快命令兜底的。
+// 编排引擎里 pull、build 可能跑几分钟，它们自己带了更长的 deadline；
+// 如果这里不分青红皂白再叠加 60 秒，调用方给的 5 分钟就形同虚设，
+// 拉大镜像总会在一分钟时被无声截断。
+func (c *Client) withTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if _, has := ctx.Deadline(); has || c.timeout <= 0 {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(ctx, c.timeout)
+}
+
 // Run 执行一条 wslc 子命令，例如 Run(ctx, "list", "-a", "--format", "json")。
 //
 // 它不会因为非零退出码返回 error——那是 Result 的一部分——只有在无法启动
@@ -172,14 +188,8 @@ func (c *Client) Run(ctx context.Context, args ...string) (Result, error) {
 	// 否则回调里若再调用本客户端就会自锁。
 	c.mu.Lock()
 
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	if c.timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.timeout)
-		defer cancel()
-	}
+	ctx, cancel := c.withTimeout(ctx)
+	defer cancel()
 
 	cmd := exec.CommandContext(ctx, c.bin, args...)
 	// 隐藏自动弹出的控制台窗口：GUI 程序里调用命令行工具时必须这么做，
@@ -189,9 +199,8 @@ func (c *Client) Run(ctx context.Context, args ...string) (Result, error) {
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	// 让 wslc 输出 UTF-8；Windows 上它的表格输出可能是本地代码页，
-	// 但 JSON 输出始终是 UTF-8。
-	cmd.Env = append(os.Environ(), "PYTHONIOENCODING=utf-8")
+	// 不设置任何额外的环境变量：wslc 是原生程序，结构化输出（--format json）始终是 UTF-8，
+	// 所以我们只解析 JSON，不依赖可能随代码页变化的表格文本。
 
 	err := cmd.Run()
 	res := Result{
@@ -298,22 +307,45 @@ func absPath(p string) string {
 // （本应用的做法是通过 Window.Update 把行转发到主线程）。
 // 返回的 Output 是完整输出，便于结束后留档。
 func (c *Client) RunStream(ctx context.Context, onLine func(line string), args ...string) (Result, error) {
-	start := time.Now()
-
 	c.mu.Lock()
+	return c.stream(ctx, onLine, args, true)
+}
 
+// Follow 与 RunStream 相同，但**不占用串行锁**，专给 `logs -f` 这类长期存活的只读流使用。
+//
+// 为什么要单独一个方法：串行锁的目的是不让两个会改状态的 wslc 调用重叠；
+// 而一条 `logs -f` 可能挂几个小时。如果它也排队，在它结束之前，
+// 界面上所有的刷新、启动、停止都会被堵死。读日志不改任何状态，不需要这把锁。
+//
+// 没有默认超时（跟随日志本来就是长期的）：调用方用 ctx 控制何时结束。
+func (c *Client) Follow(ctx context.Context, onLine func(line string), args ...string) (Result, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if c.timeout > 0 {
+	return c.stream(ctx, onLine, args, false)
+}
+
+// stream 是 RunStream 与 Follow 的共同实现。
+//
+// locked 为 true 表示调用方已经持有串行锁，本函数负责在命令结束后释放；
+// 为 false 表示不走串行锁，也不套默认超时。
+func (c *Client) stream(ctx context.Context, onLine func(line string), args []string, locked bool) (Result, error) {
+	start := time.Now()
+
+	unlock := func() {
+		if locked {
+			c.mu.Unlock()
+			locked = false
+		}
+	}
+	if locked {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, c.timeout)
+		ctx, cancel = c.withTimeout(ctx)
 		defer cancel()
 	}
 
 	cmd := exec.CommandContext(ctx, c.bin, args...)
 	hideWindow(cmd)
-	cmd.Env = append(os.Environ(), "PYTHONIOENCODING=utf-8")
 
 	// 把 stdout 与 stderr 合并到同一个管道：wslc 的进度信息两个流都可能有。
 	pr, pw := io.Pipe()
@@ -323,7 +355,7 @@ func (c *Client) RunStream(ctx context.Context, onLine func(line string), args .
 	if err := cmd.Start(); err != nil {
 		_ = pw.Close()
 		_ = pr.Close()
-		c.mu.Unlock()
+		unlock()
 		res := Result{Args: args, ExitCode: -1, Duration: time.Since(start)}
 		c.callHook(res)
 		return res, fmt.Errorf("启动 %s 失败: %w", strings.Join(args, " "), err)
@@ -359,7 +391,7 @@ func (c *Client) RunStream(ctx context.Context, onLine func(line string), args .
 		ExitCode: 0,
 		Duration: time.Since(start),
 	}
-	c.mu.Unlock()
+	unlock()
 
 	if waitErr != nil {
 		var ee *exec.ExitError
