@@ -157,6 +157,10 @@ type App struct {
 	outputBusy  bool
 	// outputHeight 是表格与输出面板之间分隔条的位置（上半栏高度）。
 	outputHeight float32
+
+	// composeListWidth 是 Compose 详情里「服务表 / 启动选项」之间
+	// 分隔条的宽度（服务表那一侧）。可拖动，并写入设置。
+	composeListWidth float32
 	// outputLines 是流式输出已收到的行数，用于状态提示。
 	outputLines int
 	// outputScroll 保存输出面板的滚动位置，配合 FollowEnd 让新行自动可见。
@@ -239,6 +243,9 @@ func New() *App {
 	}
 	// 默认让表格占 58%，下面留给日志。
 	a.outputHeight = 380
+	// 服务表与启动选项的默认分界：给选项栏留足宽度，
+	// 否则描述文字会逐词换行（"Equival / ent to / up -d"）。
+	a.composeListWidth = 400
 	a.logFollow = true
 	return a
 }
@@ -251,6 +258,9 @@ func (a *App) Init() {
 		a.hideStopped = s.HideStopped
 		if s.SidebarWidth > 0 {
 			a.sidebarW = s.SidebarWidth
+		}
+		if s.ComposeListWidth > 0 {
+			a.composeListWidth = s.ComposeListWidth
 		}
 	} else {
 		a.settings = store.DefaultSettings()

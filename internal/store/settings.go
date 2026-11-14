@@ -28,6 +28,8 @@ type Settings struct {
 	HideStopped bool `json:"hideStopped"`
 	// SidebarWidth 记住侧边栏宽度。
 	SidebarWidth float32 `json:"sidebarWidth"`
+	// ComposeListWidth 记住 Compose 详情里服务表那一侧的宽度。
+	ComposeListWidth float32 `json:"composeListWidth"`
 	// Accent 是强调色标识（magenta / violet / blue / teal / amber / green）。
 	// 空表示用出厂默认。
 	Accent string `json:"accent"`

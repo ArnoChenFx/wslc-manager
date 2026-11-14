@@ -199,23 +199,29 @@ func (a *App) projectDetail(c *ui.Context) {
 		a.projectHeader(c, *p)
 		ui.Divider(c)
 
-		// 主体：服务列表 + 选项
+		// 主体：服务列表 + 选项，中间用可拖动的分隔条。
 		//
-		// 两栏都必须能在空间不足时让位：
-		// 服务表 5 列的自然宽度合计约 710，选项栏固定 260，
-		// 加起来超过默认窗口（1180）里右栏可用的约 670，
-		// 结果整个「启动选项」被推到窗口之外（实测 x=1225）。
+		// 用 ui.Split 而不是 Row + Divider：后者是一条静态线，
+		// 用户无法调整两栏比例。服务表列多、选项栏文字长，
+		// 固定比例总有一边不合适（曾经把描述挤成 "Equival / ent to"）。
 		//
-		// Grow + Shrink 让表格按剩余空间收缩，选项栏给一个更窄的基准宽度。
-		ui.Row(c).Grow(1).FillWidth().AlignItems(ui.Stretch).Children(func() {
-			ui.Column(c).Grow(1).Shrink(1).FillHeight().MinWidth(240).Children(func() {
+		// *size 是第一栏（服务表）的宽度，会被 Split 限制在
+		// 距两端各 40 DIP 之内，拖出去也不会把另一栏挤没。
+		split := ui.Split(c, &a.composeListWidth, func() {
+			ui.Column(c).FillHeight().Children(func() {
 				a.serviceTable(c, *p)
 			})
-			ui.Divider(c)
-			ui.Column(c).Width(210).MinWidth(180).Shrink(1).FillHeight().Children(func() {
+		}, func() {
+			ui.Column(c).FillHeight().Children(func() {
 				a.projectOptions(c, *p)
 			})
-		})
+		}).Grow(1).FillWidth().SplitReset(400)
+
+		// 拖动结束后记住位置，下次打开保持。
+		if split.Changed() {
+			a.settings.ComposeListWidth = a.composeListWidth
+			a.saveSettings()
+		}
 	})
 }
 
@@ -385,14 +391,15 @@ func (a *App) serviceTable(c *ui.Context, p compose.Project) {
 	}
 
 	cols := []ui.TableColumn{
-		// 列宽按「详情区 678 − 选项栏 210 − 分隔」≈ 460 来配：
-		// MinWidth 合计 250，保证表格能被压到 460 而不溢出，
-		// 把空间让给右侧的启动选项（之前它被裁在窗口外）。
-		{Title: locales.ComposeServices(), Width: 130, MinWidth: 70},
-		{Title: locales.ContainersImage(), MinWidth: 110},
-		{Title: locales.CommonPort(), Width: 120, MinWidth: 60},
-		{Title: locales.CommonDependsOn(), Width: 100, MinWidth: 50},
-		{Title: locales.CommonReplicas(), Width: 46, MinWidth: 36, Align: ui.End},
+		// 详情区默认只有约 678（1180 窗口），要同时容纳服务表和
+		// 启动选项栏。第一栏默认 400，列宽总和必须控制在 400 以内，
+		// 否则最后一列会被压成 0 宽（曾实测「副本数」列宽 = 0）。
+		// 分隔条可拖动，想看更宽的服务表可以自己拉。
+		{Title: locales.ComposeServices(), Width: 96, MinWidth: 56},
+		{Title: locales.ContainersImage(), MinWidth: 84},
+		{Title: locales.CommonPort(), Width: 96, MinWidth: 52},
+		{Title: locales.CommonDependsOn(), Width: 72, MinWidth: 40},
+		{Title: locales.CommonReplicas(), Width: 40, MinWidth: 30, Align: ui.End},
 	}
 
 	a.serviceList.Key = func(i int) any {
@@ -598,6 +605,20 @@ func serviceDetailText(p compose.Project, name string) string {
 	return b.String()
 }
 
+// optionSwitch 画一行「开关 + 标签」，描述另起一行。
+//
+// 不用 Form/Field 的原因见调用处：窄栏里标签列会挤掉描述的空间。
+func (a *App) optionSwitch(c *ui.Context, label, desc string, value *bool) {
+	t := c.Theme()
+	ui.Column(c).FillWidth().Gap(2).Children(func() {
+		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+			ui.Switch(c, value).Label(label)
+			ui.Text(c, label).FontSize(12).Shrink(1).SingleLine().Grow(1)
+		})
+		ui.Text(c, desc).FontSize(11).TextColor(t.TextMuted).Grow(1)
+	})
+}
+
 // projectOptions 是项目右侧的操作选项面板。
 func (a *App) projectOptions(c *ui.Context, p compose.Project) {
 	t := c.Theme()
@@ -605,19 +626,16 @@ func (a *App) projectOptions(c *ui.Context, p compose.Project) {
 	ui.Column(c).FillWidth().Shrink(1).FillHeight().Padding(10, 12).Gap(10).Children(func() {
 		ui.Text(c, locales.ComposeStartOptions()).FontSize(12).Bold().TextColor(t.TextMuted)
 
-		ui.Form(c, func() {
-			ui.Field(c, locales.ImagesPullRunning(), func() {
-				ui.Switch(c, &a.upDetach).Label(locales.ImagesPullRunning())
-			}).Description(locales.ComposeUpTooltip())
-
-			ui.Field(c, locales.ComposeStartFirst(), func() {
-				ui.Switch(c, &a.upBuild).Label(locales.ComposeStartFirst())
-			}).Description(locales.ComposeBuildTooltip())
-
-			ui.Field(c, locales.ComposeRemoveVolumes(), func() {
-				ui.Switch(c, &a.downVolumes).Label(locales.ComposeRemoveVolumes())
-			}).Description(locales.ComposeRemoveVolumesTooltip())
-		})
+		// 这里刻意不用 ui.Form：Form 会把标签排成独立左列、描述再占一列，
+		// 在这个窄栏里标签列先吃掉一半宽度，描述被压成
+		// "Equival / ent to / up -d" 这种逐词换行（用户截图确认过）。
+		// 改成「标签 + 开关同一行、描述另起一行」，宽度全给文字。
+		a.optionSwitch(c, locales.ImagesPullRunning(),
+			locales.ComposeUpTooltip(), &a.upDetach)
+		a.optionSwitch(c, locales.ComposeStartFirst(),
+			locales.ComposeBuildTooltip(), &a.upBuild)
+		a.optionSwitch(c, locales.ComposeRemoveVolumes(),
+			locales.ComposeRemoveVolumesTooltip(), &a.downVolumes)
 
 		ui.Divider(c)
 
