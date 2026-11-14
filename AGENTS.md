@@ -24,10 +24,11 @@
 ## 分层约束
 
 ```
-internal/app      → 只依赖 wslc / compose / store，不直接 exec
+internal/app      → 只依赖 wslc / compose / store / selfupdate，不直接 exec
 internal/wslc     → 只封装 wslc 命令行
 internal/compose  → 只封装 wslc-compose
 internal/store    → 只读写设置文件
+internal/selfupdate → 只封装 MyGo 的更新插件（注册、读状态、触发检查）
 ```
 
 - **内部包不允许反向依赖 `internal/app`。**
@@ -50,6 +51,7 @@ internal/store    → 只读写设置文件
 | 目录扫描 | 用 `t.TempDir()` 造真实目录树 |
 | 视图布局/文案 | `ui.NewTester` + `Access`/`Find` 量几何 |
 | 与 wslc-compose 的契约 | 集成测试，未安装时 `t.Skip` |
+| 更新配置 / 发布流程（`mygo.json`、`release.yml`） | 契约测试：解析文件断言约定，见 `internal/selfupdate/release_test.go` |
 | 崩溃/死锁类修复 | 必须补回归测试，注释写明崩溃现象 |
 
 回归测试的注释要写明**它防的是什么缺陷**，例如：
@@ -75,6 +77,26 @@ internal/store    → 只读写设置文件
 - 同一 `Row` 里各子块的行数要一致，否则基线错位。
 - 文字行里的装饰圆点用 `ui.Icon`，不要用裸 `Box`。
 - `ui.Divider` 在 `Row` 中是横线；竖分隔条用 `Width(1)` 的 `Box`。
+
+## 发布与自更新
+
+应用用 MyGo 自带的更新插件自更新：发布时 `mygo build` 用私钥给更新包签名，
+应用里的插件从 GitHub **最新发布**读取 `update-windows-amd64.json`，校验签名后下载、替换、重启。
+
+- 应用侧只通过 `internal/selfupdate` 接入。**不要**在界面里直接调 MyGo 的 `updater` 包：
+  插件没注册时它的每个函数都会 panic（单测、`go run` 都是这种情况），
+  而且读状态要探测安装目录能否写入（磁盘 IO），所以视图只读 `App.upd` 这份快照。
+- 版本号只有一个来源：`mygo.json` 的 `version`，发布流程按 tag 改写它。
+  不要在代码里写死版本号。
+- 公钥在 `mygo.json` 的 `updates.publicKey`（可以入库）。**私钥绝不入库**：
+  本机在 `%APPDATA%\mygo\update-keys\wslc-manager\mygo-update.key`，CI 里是仓库
+  secret `MYGO_UPDATER_PRIVATE_KEY`。丢了私钥，已安装的程序就再也收不到更新，
+  请另存一份到密码管理器。
+- `release.yml` 缺私钥会直接失败；会校验更新文件与 tag 一致；先建草稿、传完再公开
+  （应用从「最新发布」读 manifest，不能让它早于更新包可见）。
+  改动它之前先跑 `go test ./internal/selfupdate/`，契约测试会指出哪条约定被破坏。
+- 第一个带自更新的版本只能让**之后**的版本被更新到；已装的旧版（没有更新插件）
+  要手动装一次。
 
 ## 诊断与自查
 

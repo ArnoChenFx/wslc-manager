@@ -20,6 +20,7 @@ import (
 
 	"github.com/arno/wslc-manager/internal/compose"
 	"github.com/arno/wslc-manager/internal/envsetup"
+	"github.com/arno/wslc-manager/internal/selfupdate"
 	"github.com/arno/wslc-manager/internal/store"
 	"github.com/arno/wslc-manager/internal/wslc"
 	"github.com/arno/wslc-manager/locales"
@@ -131,6 +132,20 @@ type App struct {
 	env        envsetup.Status
 	envChecked bool
 
+	// ---- 应用自更新 ----
+	// selfUpdate 是与 MyGo 更新插件之间的接口，默认指向真实实现；
+	// 测试替换成假的，避免联网和弹出窗口。
+	selfUpdate selfupdate.Controller
+	// upd 是更新状态的快照，视图只读它。
+	//
+	// 不让视图直接问插件：读状态要探测安装目录是否可写（磁盘 IO），
+	// 每帧都调就会拖慢界面。快照在启动时、插件通知变化时刷新（见 refreshUpdateStatus）。
+	upd selfupdate.Status
+	// updSeq 给每次刷新编号，晚到的旧结果据此丢弃，避免覆盖更新的状态。
+	updSeq int
+	// updOff 取消对插件变化通知的订阅。
+	updOff func()
+
 	// ---- 界面状态 ----
 	page        Page
 	query       string // 顶部搜索框
@@ -238,6 +253,7 @@ type App struct {
 func New() *App {
 	a := &App{
 		logs:         newLogBuffer(logBufferSize),
+		selfUpdate:   selfupdate.New(),
 		page:         PageContainers,
 		upDetach:     true,
 		busy:         map[string]bool{},

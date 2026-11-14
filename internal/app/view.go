@@ -151,7 +151,13 @@ func (a *App) sidebar(c *ui.Context) {
 					ui.Badge(c, fmt.Sprint(n)).TextColor(t.TextMuted)
 				}
 			})
-			ui.SidebarItem(c, pageID(PageSystem), icon("cpu"), locales.NavSystem())
+			ui.SidebarItem(c, pageID(PageSystem), icon("cpu"), locales.NavSystem()).Children(func() {
+				// 有新版本时挂一个「新」徽标，点进系统页就是更新卡片。
+				// 用徽标而不是在状态栏加按钮：按钮会把状态栏撑高，整个窗口的布局跟着抖。
+				if a.upd.Available != "" {
+					ui.Badge(c, locales.UpdateBadge()).TextColor(t.Warning)
+				}
+			})
 		})
 	}).Fill()
 

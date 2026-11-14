@@ -3,10 +3,19 @@ name: Release
 # Publishing a vX.X.X tag publishes a release.
 #
 # Steps:
-#   1. Set mygo.json's version to the tag's version (build artifacts and
+#   1. Check that the update signing key is available (fail fast).
+#   2. Set mygo.json's version to the tag's version (build artifacts and
 #      the installer name both take it from there).
-#   2. mygo build produces the portable executable and the NSIS installer.
-#   3. Zip, checksums, and upload to the GitHub release of that tag.
+#   3. mygo build produces the portable executable, the NSIS installer and,
+#      signed with the key, the update archive and its manifest.
+#   4. Verify the update files, then zip and checksum.
+#   5. Upload everything to a draft release of that tag, then publish it.
+#
+# Installed apps read update-windows-amd64.json from the latest release
+# (releases/latest/download/) and download the archive it names. The
+# manifest and the archive are therefore part of every release, never
+# optional: a release without them is one that no installed app can
+# update to.
 on:
   push:
     tags:
@@ -28,6 +37,19 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+
+      # mygo build still succeeds without the signing key; it just skips the
+      # update files, quietly. Stop here instead, before anything is built or
+      # published, with a message that says what to do.
+      - name: Check the update signing key
+        shell: pwsh
+        env:
+          MYGO_UPDATER_PRIVATE_KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
+        run: |
+          if (-not $env:MYGO_UPDATER_PRIVATE_KEY) {
+            Write-Host "::error title=Missing update signing key::Add the repository secret MYGO_UPDATER_PRIVATE_KEY (the contents of mygo-update.key). Without it this release cannot be updated to."
+            exit 1
+          }
 
       - name: Enable cgo
         shell: pwsh
@@ -62,7 +84,50 @@ jobs:
 
       - name: Build
         shell: pwsh
+        env:
+          # Signs the update archive. Only this step and the check above get
+          # the key; the test step does not need it and never sees it.
+          MYGO_UPDATER_PRIVATE_KEY: ${{ secrets.MYGO_UPDATER_PRIVATE_KEY }}
         run: go tool mygo build -platform windows/amd64
+
+      # Check what installed apps will look for, and that it belongs to this
+      # tag: the app downloads the archive from the URL inside the manifest,
+      # so the file uploaded must have exactly the name that URL ends with.
+      - name: Verify the update files
+        id: update
+        shell: pwsh
+        run: |
+          $out = "build/windows-amd64"
+          $ver = "${{ steps.version.outputs.version }}"
+          $tag = "${{ github.ref_name }}"
+          $archive = "wslc-manager-$ver-windows-amd64.tar.gz"
+          $manifest = "update-windows-amd64.json"
+
+          foreach ($f in @($archive, $manifest)) {
+            if (-not (Test-Path "$out/$f")) {
+              throw "Missing $out/$f. Was the signing key available to mygo build?"
+            }
+          }
+
+          $m = Get-Content "$out/$manifest" -Raw | ConvertFrom-Json
+          if ($m.version -ne $ver) {
+            throw "The manifest says version $($m.version), the tag says $ver"
+          }
+          $expectedUrl = "https://github.com/${{ github.repository }}/releases/download/$tag/$archive"
+          if ($m.url -ne $expectedUrl) {
+            throw "The manifest points at $($m.url), expected $expectedUrl. Does updates.github in mygo.json name this repository?"
+          }
+          if (-not $m.signature) { throw "The manifest has no signature" }
+          if ([int64]$m.size -ne (Get-Item "$out/$archive").Length) {
+            throw "The manifest size does not match the archive"
+          }
+
+          Write-Host "Update files are consistent with $tag"
+          Get-ChildItem "$out/*.delta" -ErrorAction SilentlyContinue |
+            ForEach-Object { Write-Host "  delta: $($_.Name)" }
+
+          "archive=$out/$archive" >> $env:GITHUB_OUTPUT
+          "manifest=$out/$manifest" >> $env:GITHUB_OUTPUT
 
       - name: Package
         id: package
@@ -105,12 +170,21 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: WSLC Manager ${{ steps.version.outputs.version }}
-          draft: false
+          # A draft first, published by the next step. Apps read the manifest
+          # from the latest release, so it must not be visible before every
+          # file it points to has finished uploading.
+          draft: true
+          # Tags like v0.3.0-rc.1 are prereleases, which are never "latest", so
+          # installed apps skip them.
+          prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true
           files: |
             ${{ steps.package.outputs.zip }}
             ${{ steps.package.outputs.setup }}
             SHA256SUMS.txt
+            ${{ steps.update.outputs.archive }}
+            ${{ steps.update.outputs.manifest }}
+            build/windows-amd64/*.delta
           body: |
             ## WSLC Manager ${{ steps.version.outputs.version }}
 
@@ -135,3 +209,12 @@ jobs:
             - Chinese and English UI, switchable in Settings
             - Six accent colors
             - Diagnostic reports with versions, element coordinates and recent logs
+            - Built-in updates: checks this repository's releases by itself and installs a new version when you say so (turn it off in Settings)
+
+            `wslc-manager-*.tar.gz`, `update-windows-amd64.json` and `*.delta` are what the in-app updater downloads; you do not need them.
+
+      - name: Publish the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "${{ github.ref_name }}" --draft=false --repo "${{ github.repository }}"

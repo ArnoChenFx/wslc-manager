@@ -436,5 +436,21 @@
   "composeAlreadyRunning": "The project is already running",
   "composeNotRunning": "The project is not running",
   "composeNothingToRemove": "The project has no containers to remove",
-  "composePartialRunning": "{running} of {total} containers running"
+  "composePartialRunning": "{running} of {total} containers running",
+  "updateTitle": "App updates",
+  "updateStatus": "Update status",
+  "updateUpToDate": "You're up to date",
+  "updateAvailable": "Version {version} is available",
+  "updateUnsupported": "This build can't update itself",
+  "updateUnsupportedHint": "Development builds, and copies in a folder that can't be written to (such as Program Files), can't update themselves. Download new versions from the GitHub releases page.",
+  "updateLastCheck": "Last checked",
+  "updateNeverChecked": "Not checked yet",
+  "updateCheckNow": "Check for updates",
+  "updateViewAvailable": "View {version} and update",
+  "updateCheckTooltip": "Look for a new version online. If there is one, a window shows what changed.",
+  "updateBadge": "New",
+  "settingsAutoCheckUpdates": "Check for updates automatically",
+  "settingsAutoCheckUpdatesHint": "Checks about 10 seconds after launch, then once a day, and tells you when a new version is out.",
+  "settingsAutoInstallUpdates": "Install updates automatically",
+  "settingsAutoInstallUpdatesHint": "Downloads new versions in the background and installs them at the next launch, without asking."
 }

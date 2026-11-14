@@ -4495,3 +4495,167 @@ func ComposePartialRunning(running int, total int) string {
 func (msgs Messages) ComposePartialRunning(running int, total int) string {
 	return Catalog.Format(msgs.locale, "composePartialRunning", map[string]any{"running": running, "total": total})
 }
+
+// UpdateTitle says "应用更新"
+// in the language the app shows.
+func UpdateTitle() string { return In(i18n.Locale()).UpdateTitle() }
+
+// UpdateTitle says "应用更新"
+// in the language of msgs.
+func (msgs Messages) UpdateTitle() string {
+	return Catalog.Format(msgs.locale, "updateTitle", nil)
+}
+
+// UpdateStatus says "更新状态"
+// in the language the app shows.
+func UpdateStatus() string { return In(i18n.Locale()).UpdateStatus() }
+
+// UpdateStatus says "更新状态"
+// in the language of msgs.
+func (msgs Messages) UpdateStatus() string {
+	return Catalog.Format(msgs.locale, "updateStatus", nil)
+}
+
+// UpdateUpToDate says "已是最新版本"
+// in the language the app shows.
+func UpdateUpToDate() string { return In(i18n.Locale()).UpdateUpToDate() }
+
+// UpdateUpToDate says "已是最新版本"
+// in the language of msgs.
+func (msgs Messages) UpdateUpToDate() string {
+	return Catalog.Format(msgs.locale, "updateUpToDate", nil)
+}
+
+// UpdateAvailable says "发现新版本 {version}"
+// in the language the app shows.
+func UpdateAvailable(version string) string { return In(i18n.Locale()).UpdateAvailable(version) }
+
+// UpdateAvailable says "发现新版本 {version}"
+// in the language of msgs.
+func (msgs Messages) UpdateAvailable(version string) string {
+	return Catalog.Format(msgs.locale, "updateAvailable", map[string]any{"version": version})
+}
+
+// UpdateUnsupported says "此版本不支持自动更新"
+// in the language the app shows.
+func UpdateUnsupported() string { return In(i18n.Locale()).UpdateUnsupported() }
+
+// UpdateUnsupported says "此版本不支持自动更新"
+// in the language of msgs.
+func (msgs Messages) UpdateUnsupported() string {
+	return Catalog.Format(msgs.locale, "updateUnsupported", nil)
+}
+
+// UpdateUnsupportedHint says "开发版本，或程序所在目录不可写（比如放在 Program Files 里）时无法自动更新。可以到 Gi…"
+// in the language the app shows.
+func UpdateUnsupportedHint() string { return In(i18n.Locale()).UpdateUnsupportedHint() }
+
+// UpdateUnsupportedHint says "开发版本，或程序所在目录不可写（比如放在 Program Files 里）时无法自动更新。可以到 Gi…"
+// in the language of msgs.
+func (msgs Messages) UpdateUnsupportedHint() string {
+	return Catalog.Format(msgs.locale, "updateUnsupportedHint", nil)
+}
+
+// UpdateLastCheck says "上次检查"
+// in the language the app shows.
+func UpdateLastCheck() string { return In(i18n.Locale()).UpdateLastCheck() }
+
+// UpdateLastCheck says "上次检查"
+// in the language of msgs.
+func (msgs Messages) UpdateLastCheck() string {
+	return Catalog.Format(msgs.locale, "updateLastCheck", nil)
+}
+
+// UpdateNeverChecked says "尚未检查"
+// in the language the app shows.
+func UpdateNeverChecked() string { return In(i18n.Locale()).UpdateNeverChecked() }
+
+// UpdateNeverChecked says "尚未检查"
+// in the language of msgs.
+func (msgs Messages) UpdateNeverChecked() string {
+	return Catalog.Format(msgs.locale, "updateNeverChecked", nil)
+}
+
+// UpdateCheckNow says "检查更新"
+// in the language the app shows.
+func UpdateCheckNow() string { return In(i18n.Locale()).UpdateCheckNow() }
+
+// UpdateCheckNow says "检查更新"
+// in the language of msgs.
+func (msgs Messages) UpdateCheckNow() string {
+	return Catalog.Format(msgs.locale, "updateCheckNow", nil)
+}
+
+// UpdateViewAvailable says "查看 {version} 并更新"
+// in the language the app shows.
+func UpdateViewAvailable(version string) string {
+	return In(i18n.Locale()).UpdateViewAvailable(version)
+}
+
+// UpdateViewAvailable says "查看 {version} 并更新"
+// in the language of msgs.
+func (msgs Messages) UpdateViewAvailable(version string) string {
+	return Catalog.Format(msgs.locale, "updateViewAvailable", map[string]any{"version": version})
+}
+
+// UpdateCheckTooltip says "联网查看是否有新版本；有的话会弹出窗口，显示更新内容。"
+// in the language the app shows.
+func UpdateCheckTooltip() string { return In(i18n.Locale()).UpdateCheckTooltip() }
+
+// UpdateCheckTooltip says "联网查看是否有新版本；有的话会弹出窗口，显示更新内容。"
+// in the language of msgs.
+func (msgs Messages) UpdateCheckTooltip() string {
+	return Catalog.Format(msgs.locale, "updateCheckTooltip", nil)
+}
+
+// UpdateBadge says "新"
+// in the language the app shows.
+func UpdateBadge() string { return In(i18n.Locale()).UpdateBadge() }
+
+// UpdateBadge says "新"
+// in the language of msgs.
+func (msgs Messages) UpdateBadge() string {
+	return Catalog.Format(msgs.locale, "updateBadge", nil)
+}
+
+// SettingsAutoCheckUpdates says "自动检查更新"
+// in the language the app shows.
+func SettingsAutoCheckUpdates() string { return In(i18n.Locale()).SettingsAutoCheckUpdates() }
+
+// SettingsAutoCheckUpdates says "自动检查更新"
+// in the language of msgs.
+func (msgs Messages) SettingsAutoCheckUpdates() string {
+	return Catalog.Format(msgs.locale, "settingsAutoCheckUpdates", nil)
+}
+
+// SettingsAutoCheckUpdatesHint says "启动后约 10 秒检查一次，之后每天一次；发现新版本时弹出窗口提示。"
+// in the language the app shows.
+func SettingsAutoCheckUpdatesHint() string { return In(i18n.Locale()).SettingsAutoCheckUpdatesHint() }
+
+// SettingsAutoCheckUpdatesHint says "启动后约 10 秒检查一次，之后每天一次；发现新版本时弹出窗口提示。"
+// in the language of msgs.
+func (msgs Messages) SettingsAutoCheckUpdatesHint() string {
+	return Catalog.Format(msgs.locale, "settingsAutoCheckUpdatesHint", nil)
+}
+
+// SettingsAutoInstallUpdates says "自动安装更新"
+// in the language the app shows.
+func SettingsAutoInstallUpdates() string { return In(i18n.Locale()).SettingsAutoInstallUpdates() }
+
+// SettingsAutoInstallUpdates says "自动安装更新"
+// in the language of msgs.
+func (msgs Messages) SettingsAutoInstallUpdates() string {
+	return Catalog.Format(msgs.locale, "settingsAutoInstallUpdates", nil)
+}
+
+// SettingsAutoInstallUpdatesHint says "发现新版本后在后台下载，下次启动时直接安装，不再询问。"
+// in the language the app shows.
+func SettingsAutoInstallUpdatesHint() string {
+	return In(i18n.Locale()).SettingsAutoInstallUpdatesHint()
+}
+
+// SettingsAutoInstallUpdatesHint says "发现新版本后在后台下载，下次启动时直接安装，不再询问。"
+// in the language of msgs.
+func (msgs Messages) SettingsAutoInstallUpdatesHint() string {
+	return Catalog.Format(msgs.locale, "settingsAutoInstallUpdatesHint", nil)
+}

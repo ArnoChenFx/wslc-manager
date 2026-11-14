@@ -35,6 +35,11 @@ Compose files are **never parsed by this app**. Every action goes through [`wslc
 ### System
 Environment versions, WSL sessions, and a one-click dependency check that can install or upgrade what is missing.
 
+### Updates
+The app checks this repository's releases shortly after launch and then once a day, and offers a new version in a small window: **Install Update**, **Remind Me Later** or **Skip This Version**. Updates are signed: the app verifies the signature against a public key built into it before it replaces itself, and downloads only what changed when it can. Check by hand on the **System** page, or switch automatic checks and automatic installs off in **Settings**. The check contacts `github.com`.
+
+Self-updating needs a copy that can write to its own folder. The installer's per-user install and a portable copy in an ordinary folder qualify; a copy under `Program Files` does not, and the System page says so.
+
 ### Diagnostics
 Found a layout glitch or a button that does nothing? Export a diagnostic report: versions, the exact on-screen coordinates of every element, and recent command and error logs — in one Markdown file. There is also a live runtime log that records every `wslc` / `wslc-compose` invocation.
 

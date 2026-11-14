@@ -5,6 +5,10 @@
   "version": "0.1.0",
   "copyright": "© 2026 ArnoChen",
   "out": "build",
+  "updates": {
+    "publicKey": "8KYwWxpWLpff76o1rls25mJkO59GtxprOHCvozQLtD4=",
+    "github": "ArnoChenFx/wslc-manager"
+  },
   "i18n": {
     "dir": "locales",
     "source": "zh-Hans"

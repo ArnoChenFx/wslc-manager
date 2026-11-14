@@ -94,7 +94,10 @@ func (a *App) BuildDiagnostic(opt DiagOptions) (string, error) {
 		}
 		fmt.Fprintf(&b, "- **%s**: %s\n", k, v)
 	}
-	kv(locales.SystemVersion(), appVersion)
+	kv(locales.SystemVersion(), appVersion())
+	// 更新状态也要写进报告：“点了检查更新没反应”类反馈，第一件事就是确认
+	// 这个构建究竟能不能自更新（开发版本不能）。
+	kv(locales.UpdateStatus(), updateSummary(a.upd))
 	kv(locales.ComposeBuild(), runtime.GOOS+"/"+runtime.GOARCH+" "+runtime.Version())
 	kv("wslc", a.wslcVer)
 	kv("wslc-compose", a.composeVer)
@@ -250,14 +253,11 @@ func (a *App) BuildDiagnostic(opt DiagOptions) (string, error) {
 	return b.String(), nil
 }
 
-// appVersion 是报告里显示的版本号。
-const appVersion = "0.1.0"
-
 // diagPayload 生成报告末尾的结构化部分。
 func (a *App) diagPayload(opt DiagOptions) map[string]any {
 	m := map[string]any{
 		"generatedAt": time.Now().Format(time.RFC3339),
-		"version":     appVersion,
+		"version":     appVersion(),
 		"page":        pages[a.page].title(),
 		"pageIndex":   int(a.page),
 		"counts": map[string]int{

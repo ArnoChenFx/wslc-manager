@@ -129,6 +129,27 @@ func (a *App) settingsDialog(c *ui.Context) {
 							ui.TextInput(c, &a.pollSecondsText).
 								Placeholder(locales.SettingsZeroDisables()).Width(160)
 						}).Description(locales.SettingsAutoRefreshHint())
+
+						// 自动更新的两个偏好由 MyGo 的更新插件保存（updater.json），
+						// 改动立即生效，不用点「保存」，和语言、强调色一样。
+						// 开关直接绑定快照里的字段，点击后下一帧就能看到新值；
+						// 插件确认后再经 OnChange 把快照校正一遍。
+						// 不支持自更新的构建（开发版本等）不会在后台检查，开关置灰并说明原因。
+						ui.Field(c, locales.SettingsAutoCheckUpdates(), func() {
+							sw := ui.Switch(c, &a.upd.AutoCheck).
+								Label(locales.SettingsAutoCheckUpdates()).Disabled(!a.upd.Supported)
+							if sw.Changed() {
+								a.setAutoCheckUpdates(a.upd.AutoCheck)
+							}
+						}).Description(a.updateFieldHint(locales.SettingsAutoCheckUpdatesHint()))
+
+						ui.Field(c, locales.SettingsAutoInstallUpdates(), func() {
+							sw := ui.Switch(c, &a.upd.AutoInstall).
+								Label(locales.SettingsAutoInstallUpdates()).Disabled(!a.upd.Supported)
+							if sw.Changed() {
+								a.setAutoInstallUpdates(a.upd.AutoInstall)
+							}
+						}).Description(a.updateFieldHint(locales.SettingsAutoInstallUpdatesHint()))
 					})
 
 					// ── 项目扫描 ──────────────────────────

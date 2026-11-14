@@ -17,6 +17,7 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"github.com/arno/wslc-manager/internal/app"
+	"github.com/arno/wslc-manager/internal/selfupdate"
 )
 
 func main() {
@@ -59,6 +60,9 @@ func main() {
 	} else if name := os.Getenv("WSLC_MANAGER_SHOT"); name != "" {
 		a.ScheduleAutoShot(name, shotDelay)
 	}
+	// 自更新：注册 MyGo 的原生更新插件，必须在 Run 之前。
+	useSelfUpdate()
+
 	// 后端探测（wslc / wslc-compose 路径、配置文件）必须在开窗前完成，
 	// 这样首帧就能展示真实的可用状态。
 	a.Init()
@@ -77,9 +81,27 @@ func main() {
 		a.AttachWindow(win)
 		// 首帧之后立刻拉一次数据。
 		a.Refresh()
+		// 窗口建好之后再接上更新状态：插件的后台检查也是应用就绪后才开始（约 10 秒后），
+		// 不占用启动路径。
+		a.WatchUpdates()
 	})
 
 	if err := mygo.App.Run(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// useSelfUpdate 注册 MyGo 的原生更新插件。
+//
+// mygo.Use 在插件无效或 Setup 失败时会 panic。更新只是附属功能，
+// 不能因为它没装上就让整个应用起不来，所以这里接住 panic 记一行日志继续启动。
+// 注册失败时 selfupdate 的标志不会置位，界面上会显示「此版本不支持自动更新」，
+// 而不是去调一个没装上的插件。
+func useSelfUpdate() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("自更新插件注册失败，已跳过: %v", r)
+		}
+	}()
+	mygo.Use(selfupdate.Plugin())
 }
