@@ -1114,5 +1114,45 @@
   "settingsAutoCheckUpdates": "自动检查更新",
   "settingsAutoCheckUpdatesHint": "启动后约 10 秒检查一次，之后每天一次；发现新版本时弹出窗口提示。",
   "settingsAutoInstallUpdates": "自动安装更新",
-  "settingsAutoInstallUpdatesHint": "发现新版本后在后台下载，下次启动时直接安装，不再询问。"
+  "settingsAutoInstallUpdatesHint": "发现新版本后在后台下载，下次启动时直接安装，不再询问。",
+  "vmTitle": "虚拟机",
+  "vmStatus": "状态",
+  "vmSession": "会话",
+  "vmMemory": "内存占用",
+  "vmMemoryTooltip": "虚拟机在 Windows 上占用的内存，对应任务管理器里的 {process} 进程；不是容器内部的用量。",
+  "@vmMemoryTooltip": {
+    "placeholders": {
+      "process": {
+        "type": "String"
+      }
+    }
+  },
+  "vmRunning": "运行中",
+  "vmStopped": "已停止",
+  "vmUnknown": "无法判断",
+  "vmStarting": "正在启动…",
+  "vmStopping": "正在关闭…",
+  "vmStart": "启动虚拟机",
+  "vmStop": "关闭虚拟机",
+  "vmStartTooltip": "启动 wslc 的虚拟机。首次启动要几秒。",
+  "vmStopTooltip": "关闭虚拟机，并终止其中所有运行中的容器。",
+  "vmHint": "容器、镜像、卷和网络都存放在这个虚拟机里。没有运行中的容器时，它会在空闲一段时间（默认 30 秒）后自动关闭；想改这个时间，可以改 wslc 设置里的 session.idleTimeout。",
+  "vmStopConfirmTitle": "关闭虚拟机",
+  "vmStopConfirmBody": "虚拟机里没有运行中的容器。关闭后，可以随时在这里再启动。",
+  "vmStopConfirmBodyRunning": "将终止虚拟机里所有运行中的容器（共 {count} 个）：{names}。容器和镜像都会保留，之后可以重新启动。",
+  "@vmStopConfirmBodyRunning": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "names": {
+        "type": "String"
+      }
+    }
+  },
+  "vmStartedToast": "虚拟机已启动",
+  "vmStoppedToast": "虚拟机已关闭",
+  "vmPaneTitle": "虚拟机未运行",
+  "vmPaneBody": "容器、镜像、卷和网络都存放在虚拟机里，需要先启动它才能查看。没有运行中的容器时，它会在空闲一段时间（默认 30 秒）后自动关闭。",
+  "vmDetectBroken": "虚拟机已启动，但在 Windows 上找不到它的进程，状态检测已停用。"
 }

@@ -25,7 +25,10 @@ func (a *App) systemPage(c *ui.Context) {
 		// 没宽度时 Column 会被压成极窄，卡片内容只好擞行，
 		// 总高度暴涨，最后一张卡片就被推到视口外。
 		ui.Column(c).FillWidth().Padding(16, 16, 28, 16).Gap(16).Children(func() {
-			// 应用自身的版本与更新：放在最前，有新版本时侧边栏的「新」徽标就指向这里。
+			// 虚拟机：容器、镜像、卷、网络都在里面，所以最先看到它在不在跑、占多少内存，并能显式启动/关闭。
+			a.vmCard(c)
+
+			// 应用自身的版本与更新：有新版本时侧边栏的「新」徽标就指向这里。
 			a.updateCard(c)
 
 			// 依赖环境：是否装了 wslc / wslc-compose，可一键安装与升级。

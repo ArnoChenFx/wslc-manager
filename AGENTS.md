@@ -24,12 +24,13 @@
 ## 分层约束
 
 ```
-internal/app      → 只依赖 wslc / compose / store / selfupdate，不直接 exec
+internal/app      → 只依赖 wslc / compose / store / selfupdate / wslvm，不直接 exec
 internal/wslc     → 只封装 wslc 命令行
 internal/compose  → 内置的 Compose 引擎：依赖 compose-go，经 Runtime 接口调用 wslc；
                     不 import internal/wslc，也不 import internal/app
 internal/store    → 只读写设置文件
 internal/selfupdate → 只封装 MyGo 的更新插件（注册、读状态、触发检查）
+internal/wslvm    → 只在宿主机一侧观测会话的虚拟机（vmmem 进程：在不在、占多少内存），不调用 wslc
 internal/composert → 把 wslc.Client 适配成 compose.Runtime（图形界面与命令行共用）
 cmd/wslc-compose  → 命令行版 Compose：只依赖 compose / composert / wslc，
                     **不 import internal/app，也不 import MyGo**
@@ -93,6 +94,7 @@ cmd/wslc-compose  → 命令行版 Compose：只依赖 compose / composert / wsl
 | 与真实 wslc 的契约 | 集成测试（`realwslc_test.go`），未安装时 `t.Skip` |
 | 命令行（选项映射、输出流、退出码） | 假引擎（`cmd/wslc-compose/cli_test.go`）；`config` 这类不需要 wslc 的命令用真实引擎 + 一旦被调用就失败的 `Runtime` |
 | 更新配置 / 发布流程（`mygo.json`、`release.yml`） | 契约测试：解析文件断言约定，见 `internal/selfupdate/release_test.go` |
+| 虚拟机的状态与刷新门控 | `wslctest` 假 wslc 记录命令 + `fakeHost` 假宿主机，断言「没有发出会叫醒虚拟机的命令」，见 `internal/app/vmgate_test.go` |
 | 崩溃/死锁类修复 | 必须补回归测试，注释写明崩溃现象 |
 
 回归测试的注释要写明**它防的是什么缺陷**，例如：
@@ -141,6 +143,36 @@ cmd/wslc-compose  → 命令行版 Compose：只依赖 compose / composert / wsl
 - 第一个带自更新的版本只能让**之后**的版本被更新到；已装的旧版（没有更新插件）
   要手动装一次。
 
+## 虚拟机（wslc 会话）
+
+wslc 的容器、镜像、卷、网络都在会话的虚拟机里。以下事实已对照 WSL 源码和微软官方文档核实（证据见 `docs/note/dev-notes.md`）：
+
+- 会话和虚拟机都是**按需创建**的。要和虚拟机里的 Docker 引擎对话的命令（`list`、`images`、
+  `volume`、`network`、`run`……）在虚拟机没运行时会把它**拉起来**；只问会话管理器的命令
+  （`info`、`system session list`、`--version`）不会。
+- 虚拟机空闲 `session.idleTimeout` 秒（默认 30）后自己关闭，会话还在，下一条命令再把它建起来。
+  有运行中的容器或进行中的操作就不会空闲关闭。
+- 「启动」= 跑一条要用到虚拟机的命令（`wslc list`，微软自己的测试也这么建默认会话）；
+  「关闭」= `wslc system session terminate`。**不要用 `wsl --shutdown`**，它会关掉所有 WSL 虚拟机，
+  包括普通 WSL2 的发行版。`terminate` 在会话不存在时报错，不会先建再杀。
+- 默认会话名是 `wslc-cli-<用户名>`，提权后是 `wslc-cli-admin-<用户名>`；它的虚拟机在宿主机上是
+  `vmmem<会话名>` 进程，工作集就是占用的内存。普通 WSL2 的虚拟机叫 `vmmemWSL`，是另一个东西。
+
+由此得到的规则：
+
+- **后台刷新不得发会拉起虚拟机的命令。** `Refresh` 开头调 `refreshGated`：确定没在运行时只刷新版本、
+  `info`、会话列表。往 `Refresh` 或别的后台流程里加任何新的 wslc 调用之前，先想它会不会叫醒虚拟机；
+  `vmgate_test.go` 的 `vmBoundCalls` 是反着列的白名单，新增的调用会被它抓出来。
+- **状态只问操作系统**（`internal/wslvm`），不为了「看看它在不在」去调 wslc。
+- **观测不了（Unknown）一律照常行事。** 只有「确定已停止」才能拦，宁可多问一次，
+  也不能把运行中的虚拟机拦在界面外。启动成功却始终见不到进程时，自动停用状态判断。
+- 关闭动作要**等进程真正消失**再结束：`runAsync` 结束时会立刻刷新，那时进程还在的话，
+  刷新会照常发命令，把刚关掉的虚拟机又叫醒。
+- 测试里**不要去关真实的虚拟机**：里面可能有用户正在运行的容器。用 `internal/wslc/wslctest`
+  （批处理假 wslc）记录命令。带活 Tester 的测试里等异步动作的结果，要用 `ViewLocked` 把渲染和协程里的
+  `update` 串行起来（否则 `-race` 报数据竞争），并等「动作结束时一定会出现的那条提示」，
+  不要用「不忙且不在刷新」判断动作已结束（`runAsync` 清忙磌标记与发起刷新之间有个空档）。
+
 ## 诊断与自查
 
 **排查界面问题不要靠看截图猜。** 用工具拿数据：
@@ -159,7 +191,7 @@ cmd/wslc-compose  → 命令行版 Compose：只依赖 compose / composert / wsl
 - 「没对齐」要比较数字，不要凭观感。
 - 「点了没反应」先看运行日志里有没有对应命令，区分「没触发」还是「失败」。
 
-写日志：`a.logInfo("source", "format", ...)`，source 用 `wslc` / `compose` / `action` / `ui` / `refresh` / `diag`。
+写日志：`a.logInfo("source", "format", ...)`，source 用 `wslc` / `compose` / `action` / `ui` / `refresh` / `diag` / `vm`。
 每条 `wslc` 命令由客户端钩子自动记录；每个编排动作（up/down/…）的结果由 compose 客户端的钩子记录一行，
 不需要手动埋点。
 

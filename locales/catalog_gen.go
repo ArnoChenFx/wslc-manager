@@ -4615,3 +4615,235 @@ func SettingsAutoInstallUpdatesHint() string {
 func (msgs Messages) SettingsAutoInstallUpdatesHint() string {
 	return Catalog.Format(msgs.locale, "settingsAutoInstallUpdatesHint", nil)
 }
+
+// VmTitle says "虚拟机"
+// in the language the app shows.
+func VmTitle() string { return In(i18n.Locale()).VmTitle() }
+
+// VmTitle says "虚拟机"
+// in the language of msgs.
+func (msgs Messages) VmTitle() string {
+	return Catalog.Format(msgs.locale, "vmTitle", nil)
+}
+
+// VmStatus says "状态"
+// in the language the app shows.
+func VmStatus() string { return In(i18n.Locale()).VmStatus() }
+
+// VmStatus says "状态"
+// in the language of msgs.
+func (msgs Messages) VmStatus() string {
+	return Catalog.Format(msgs.locale, "vmStatus", nil)
+}
+
+// VmSession says "会话"
+// in the language the app shows.
+func VmSession() string { return In(i18n.Locale()).VmSession() }
+
+// VmSession says "会话"
+// in the language of msgs.
+func (msgs Messages) VmSession() string {
+	return Catalog.Format(msgs.locale, "vmSession", nil)
+}
+
+// VmMemory says "内存占用"
+// in the language the app shows.
+func VmMemory() string { return In(i18n.Locale()).VmMemory() }
+
+// VmMemory says "内存占用"
+// in the language of msgs.
+func (msgs Messages) VmMemory() string {
+	return Catalog.Format(msgs.locale, "vmMemory", nil)
+}
+
+// VmMemoryTooltip says "虚拟机在 Windows 上占用的内存，对应任务管理器里的 {process} 进程；不是容器内部的用量。"
+// in the language the app shows.
+func VmMemoryTooltip(process string) string { return In(i18n.Locale()).VmMemoryTooltip(process) }
+
+// VmMemoryTooltip says "虚拟机在 Windows 上占用的内存，对应任务管理器里的 {process} 进程；不是容器内部的用量。"
+// in the language of msgs.
+func (msgs Messages) VmMemoryTooltip(process string) string {
+	return Catalog.Format(msgs.locale, "vmMemoryTooltip", map[string]any{"process": process})
+}
+
+// VmRunning says "运行中"
+// in the language the app shows.
+func VmRunning() string { return In(i18n.Locale()).VmRunning() }
+
+// VmRunning says "运行中"
+// in the language of msgs.
+func (msgs Messages) VmRunning() string {
+	return Catalog.Format(msgs.locale, "vmRunning", nil)
+}
+
+// VmStopped says "已停止"
+// in the language the app shows.
+func VmStopped() string { return In(i18n.Locale()).VmStopped() }
+
+// VmStopped says "已停止"
+// in the language of msgs.
+func (msgs Messages) VmStopped() string {
+	return Catalog.Format(msgs.locale, "vmStopped", nil)
+}
+
+// VmUnknown says "无法判断"
+// in the language the app shows.
+func VmUnknown() string { return In(i18n.Locale()).VmUnknown() }
+
+// VmUnknown says "无法判断"
+// in the language of msgs.
+func (msgs Messages) VmUnknown() string {
+	return Catalog.Format(msgs.locale, "vmUnknown", nil)
+}
+
+// VmStarting says "正在启动…"
+// in the language the app shows.
+func VmStarting() string { return In(i18n.Locale()).VmStarting() }
+
+// VmStarting says "正在启动…"
+// in the language of msgs.
+func (msgs Messages) VmStarting() string {
+	return Catalog.Format(msgs.locale, "vmStarting", nil)
+}
+
+// VmStopping says "正在关闭…"
+// in the language the app shows.
+func VmStopping() string { return In(i18n.Locale()).VmStopping() }
+
+// VmStopping says "正在关闭…"
+// in the language of msgs.
+func (msgs Messages) VmStopping() string {
+	return Catalog.Format(msgs.locale, "vmStopping", nil)
+}
+
+// VmStart says "启动虚拟机"
+// in the language the app shows.
+func VmStart() string { return In(i18n.Locale()).VmStart() }
+
+// VmStart says "启动虚拟机"
+// in the language of msgs.
+func (msgs Messages) VmStart() string {
+	return Catalog.Format(msgs.locale, "vmStart", nil)
+}
+
+// VmStop says "关闭虚拟机"
+// in the language the app shows.
+func VmStop() string { return In(i18n.Locale()).VmStop() }
+
+// VmStop says "关闭虚拟机"
+// in the language of msgs.
+func (msgs Messages) VmStop() string {
+	return Catalog.Format(msgs.locale, "vmStop", nil)
+}
+
+// VmStartTooltip says "启动 wslc 的虚拟机。首次启动要几秒。"
+// in the language the app shows.
+func VmStartTooltip() string { return In(i18n.Locale()).VmStartTooltip() }
+
+// VmStartTooltip says "启动 wslc 的虚拟机。首次启动要几秒。"
+// in the language of msgs.
+func (msgs Messages) VmStartTooltip() string {
+	return Catalog.Format(msgs.locale, "vmStartTooltip", nil)
+}
+
+// VmStopTooltip says "关闭虚拟机，并终止其中所有运行中的容器。"
+// in the language the app shows.
+func VmStopTooltip() string { return In(i18n.Locale()).VmStopTooltip() }
+
+// VmStopTooltip says "关闭虚拟机，并终止其中所有运行中的容器。"
+// in the language of msgs.
+func (msgs Messages) VmStopTooltip() string {
+	return Catalog.Format(msgs.locale, "vmStopTooltip", nil)
+}
+
+// VmHint says "…"
+// in the language the app shows.
+func VmHint() string { return In(i18n.Locale()).VmHint() }
+
+// VmHint says "…"
+// in the language of msgs.
+func (msgs Messages) VmHint() string {
+	return Catalog.Format(msgs.locale, "vmHint", nil)
+}
+
+// VmStopConfirmTitle says "关闭虚拟机"
+// in the language the app shows.
+func VmStopConfirmTitle() string { return In(i18n.Locale()).VmStopConfirmTitle() }
+
+// VmStopConfirmTitle says "关闭虚拟机"
+// in the language of msgs.
+func (msgs Messages) VmStopConfirmTitle() string {
+	return Catalog.Format(msgs.locale, "vmStopConfirmTitle", nil)
+}
+
+// VmStopConfirmBody says "虚拟机里没有运行中的容器。关闭后，可以随时在这里再启动。"
+// in the language the app shows.
+func VmStopConfirmBody() string { return In(i18n.Locale()).VmStopConfirmBody() }
+
+// VmStopConfirmBody says "虚拟机里没有运行中的容器。关闭后，可以随时在这里再启动。"
+// in the language of msgs.
+func (msgs Messages) VmStopConfirmBody() string {
+	return Catalog.Format(msgs.locale, "vmStopConfirmBody", nil)
+}
+
+// VmStopConfirmBodyRunning says "将终止虚拟机里所有运行中的容器（共 {count} 个）：{names}…"
+// in the language the app shows.
+func VmStopConfirmBodyRunning(count int, names string) string {
+	return In(i18n.Locale()).VmStopConfirmBodyRunning(count, names)
+}
+
+// VmStopConfirmBodyRunning says "将终止虚拟机里所有运行中的容器（共 {count} 个）：{names}…"
+// in the language of msgs.
+func (msgs Messages) VmStopConfirmBodyRunning(count int, names string) string {
+	return Catalog.Format(msgs.locale, "vmStopConfirmBodyRunning", map[string]any{"count": count, "names": names})
+}
+
+// VmStartedToast says "虚拟机已启动"
+// in the language the app shows.
+func VmStartedToast() string { return In(i18n.Locale()).VmStartedToast() }
+
+// VmStartedToast says "虚拟机已启动"
+// in the language of msgs.
+func (msgs Messages) VmStartedToast() string {
+	return Catalog.Format(msgs.locale, "vmStartedToast", nil)
+}
+
+// VmStoppedToast says "虚拟机已关闭"
+// in the language the app shows.
+func VmStoppedToast() string { return In(i18n.Locale()).VmStoppedToast() }
+
+// VmStoppedToast says "虚拟机已关闭"
+// in the language of msgs.
+func (msgs Messages) VmStoppedToast() string {
+	return Catalog.Format(msgs.locale, "vmStoppedToast", nil)
+}
+
+// VmPaneTitle says "虚拟机未运行"
+// in the language the app shows.
+func VmPaneTitle() string { return In(i18n.Locale()).VmPaneTitle() }
+
+// VmPaneTitle says "虚拟机未运行"
+// in the language of msgs.
+func (msgs Messages) VmPaneTitle() string {
+	return Catalog.Format(msgs.locale, "vmPaneTitle", nil)
+}
+
+// VmPaneBody says "…"
+// in the language the app shows.
+func VmPaneBody() string { return In(i18n.Locale()).VmPaneBody() }
+
+// VmPaneBody says "…"
+// in the language of msgs.
+func (msgs Messages) VmPaneBody() string {
+	return Catalog.Format(msgs.locale, "vmPaneBody", nil)
+}
+
+// VmDetectBroken says "虚拟机已启动，但在 Windows 上找不到它的进程，状态检测已停用。"
+// in the language the app shows.
+func VmDetectBroken() string { return In(i18n.Locale()).VmDetectBroken() }
+
+// VmDetectBroken says "虚拟机已启动，但在 Windows 上找不到它的进程，状态检测已停用。"
+// in the language of msgs.
+func (msgs Messages) VmDetectBroken() string {
+	return Catalog.Format(msgs.locale, "vmDetectBroken", nil)
+}

@@ -71,7 +71,9 @@ func (a *App) toolbar(c *ui.Context) {
 	ui.Row(c).Padding(10, 12).Gap(8).AlignItems(ui.Center).Children(func() {
 		ui.Text(c, pages[a.page].title()).FontSize(15).Bold()
 
-		if n := a.countForPage(); n >= 0 {
+		// 虚拟机没运行时不显示数量：那时列表是空的，但这不是「没有容器」，而是「不知道」——
+		// 容器都在虚拟机里。显示一个「0」会误导人。
+		if n := a.countForPage(); n >= 0 && !a.vmPaneApplies() {
 			ui.Badge(c, fmt.Sprint(n)).TextColor(t.TextMuted)
 		}
 
@@ -213,6 +215,12 @@ func (a *App) pageID() string { return pageID(a.page) }
 func (a *App) content(c *ui.Context) {
 	if a.wslcErr != "" {
 		a.errorPane(c, locales.ErrorWslcUnavailable(), a.wslcErr)
+		return
+	}
+
+	// 虚拟机没在运行：容器、镜像、卷、网络都存放在里面，没有东西可看，给一个启动入口。
+	if a.vmPaneApplies() {
+		a.vmStoppedPane(c)
 		return
 	}
 

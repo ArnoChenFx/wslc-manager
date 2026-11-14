@@ -84,6 +84,8 @@ func main() {
 		// 窗口建好之后再接上更新状态：插件的后台检查也是应用就绪后才开始（约 10 秒后），
 		// 不占用启动路径。
 		a.WatchUpdates()
+		// 虚拟机状态的轮询：只读进程表，不碰 wslc，也不会把虚拟机叫醒。
+		a.WatchVM()
 	})
 
 	if err := mygo.App.Run(); err != nil {

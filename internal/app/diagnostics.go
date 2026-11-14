@@ -99,6 +99,8 @@ func (a *App) BuildDiagnostic(opt DiagOptions) (string, error) {
 	// 更新状态也要写进报告：“点了检查更新没反应”类反馈，第一件事就是确认
 	// 这个构建究竟能不能自更新（开发版本不能）。
 	kv(locales.UpdateStatus(), updateSummary(a.upd))
+	// 虚拟机状态：「容器列表是空的」「点了没反应」时，先看虚拟机是不是没在运行。
+	kv(locales.VmTitle(), vmSummary(a.vmx.snap))
 	kv(locales.ComposeBuild(), runtime.GOOS+"/"+runtime.GOARCH+" "+runtime.Version())
 	kv("wslc", a.wslcVer)
 	kv("wslc-compose", a.composeVer)

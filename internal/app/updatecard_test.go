@@ -25,6 +25,11 @@ type fakeUpdater struct {
 	status selfupdate.Status
 	// script 非空时，Status 依次取用其中的回答，用尽后回到 status。
 	script []scriptedStatus
+	// blocked 非 nil 时，Status 每次卡在脚本里的 wait 上之前，先往里发一个信号：
+	// 让测试能确定「这一次调用已经取走了脚本里的这一项」，再去发起下一次。
+	// 没有它，脚本是按 Status 被调用的先后取用的，而不是按刷新发起的先后，
+	// 两个协程谁先跑到是调度决定的。
+	blocked chan struct{}
 
 	checks      int
 	autoCheck   []bool
@@ -51,6 +56,9 @@ func (f *fakeUpdater) Status() selfupdate.Status {
 	f.mu.Unlock()
 
 	if wait != nil {
+		if f.blocked != nil {
+			f.blocked <- struct{}{}
+		}
 		<-wait
 	}
 	return st
@@ -457,8 +465,16 @@ func TestRefreshUpdateStatusDropsStaleResult(t *testing.T) {
 	old := selfupdate.Status{Version: "0.2.0", Supported: true}
 	fresh := selfupdate.Status{Version: "0.2.0", Supported: true, Available: "0.3.0"}
 	f.script = []scriptedStatus{{st: old, wait: gate}, {st: fresh}}
+	f.blocked = make(chan struct{}, 1)
 
 	a.refreshUpdateStatus() // 第一次：读到旧状态，但被挡住，迟迟不返回
+	// 必须确认第一次已经取走了「旧」这一项再发起第二次。不等的话，两个协程谁先调用 Status
+	// 全看调度：负载高时第二次抢先，取到的就是被挡住的「旧」，测试就会干等到超时。
+	select {
+	case <-f.blocked:
+	case <-time.After(3 * time.Second):
+		t.Fatal("第一次刷新没有去读状态")
+	}
 	a.refreshUpdateStatus() // 第二次：立刻读到新状态
 	waitSnapshot(t, a, func(st selfupdate.Status) bool { return st.Available == "0.3.0" })
 

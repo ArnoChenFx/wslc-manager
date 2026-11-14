@@ -111,6 +111,9 @@ type App struct {
 
 	// ---- 持久化设置 ----
 	settings store.Settings
+	// saveWG 记录还没写完的异步保存。测试结束时要等它们写完再清理临时目录，
+	// 否则写盘协程和清理抢文件，会偶发「The directory is not empty」。
+	saveWG sync.WaitGroup
 
 	// ---- 数据快照（由后台刷新写入）----
 	containers []wslc.Container
@@ -146,6 +149,10 @@ type App struct {
 	updSeq int
 	// updOff 取消对插件变化通知的订阅。
 	updOff func()
+
+	// ---- 虚拟机 ----
+	// vmx 是虚拟机的状态与依赖，见 vmcard.go。
+	vmx vmState
 
 	// ---- 界面状态 ----
 	page        Page
@@ -445,8 +452,15 @@ func (a *App) saveSettings() {
 	s := a.settings
 	s.HideStopped = a.hideStopped
 	s.SidebarWidth = a.sidebarW
-	go func() { _ = a.store.Save(s) }()
+	a.saveWG.Add(1)
+	go func() {
+		defer a.saveWG.Done()
+		_ = a.store.Save(s)
+	}()
 }
+
+// waitSaves 等待所有已发起的异步保存写完。只给测试用。
+func (a *App) waitSaves() { a.saveWG.Wait() }
 
 // ---- 后台任务 ----
 
@@ -466,6 +480,11 @@ func (a *App) Refresh() {
 		defer a.refreshMu.Unlock()
 		ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 		defer cancel()
+
+		// 虚拟机确定没在运行时，不去问容器、镜像、卷、网络：那些查询会把它拉起来。
+		if a.refreshGated(ctx) {
+			return
+		}
 
 		type snapshot struct {
 			containers []wslc.Container

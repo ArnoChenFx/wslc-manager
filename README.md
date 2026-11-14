@@ -41,6 +41,11 @@ The same engine is also available as a standalone [command-line tool](#command-l
 ### System
 Environment versions, WSL sessions, and a one-click check that can install or update WSL when `wslc` is missing.
 
+### Virtual machine
+Everything `wslc` runs lives in a lightweight virtual machine. The **System** page shows whether it is running and how much memory it holds on Windows (the `vmmem…` process in Task Manager), and lets you start and stop it yourself. Stopping it ends the containers running inside; containers and images are kept.
+
+While the virtual machine is stopped, the app asks it for nothing, because even a refresh would wake it up again. The Containers, Images, Volumes and Networks pages say so and offer a **Start VM** button. With no container running, `wslc` also stops the virtual machine by itself after a period of idleness (30 seconds by default), so a virtual machine you start with nothing in it goes back to sleep after that time; raise `session.idleTimeout` in the wslc settings to keep it longer.
+
 ### Updates
 The app checks this repository's releases shortly after launch and then once a day, and offers a new version in a small window: **Install Update**, **Remind Me Later** or **Skip This Version**. Updates are signed: the app verifies the signature against a public key built into it before it replaces itself, and downloads only what changed when it can. Check by hand on the **System** page, or switch automatic checks and automatic installs off in **Settings**. The check contacts `github.com`.
 

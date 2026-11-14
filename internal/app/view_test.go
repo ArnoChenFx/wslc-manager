@@ -22,6 +22,10 @@ func newTestApp(t *testing.T) *App {
 	t.Helper()
 	a := New()
 	a.store = store.New(t.TempDir() + "/settings.json")
+	// 清理是先注册的后执行：这条必须排在 TempDir 的清理之前执行，
+	// 等异步保存的协程写完。以前没有这一步，拖动分隔条之类会触发保存的测试
+	// 偶发失败：TempDir RemoveAll cleanup: The directory is not empty。
+	t.Cleanup(a.waitSaves)
 	a.settings = store.DefaultSettings()
 	a.settings.Projects = nil
 	a.settings.ScanRoots = nil
