@@ -152,12 +152,34 @@ func (a *App) containerTable(c *ui.Context, rows []wslc.Container) {
 		return
 	}
 
-	cols := []ui.TableColumn{
-		{Title: locales.ContainersName(), Width: 190, MinWidth: 120},
-		{Title: locales.CommonStatus(), Width: 110, MinWidth: 80},
-		{Title: locales.NavImages(), Width: 220, MinWidth: 120},
-		{Title: locales.CommonPort(), Width: 160, MinWidth: 80},
-		{Title: locales.ComposeProjects(), Width: 130, MinWidth: 80},
+	// 列宽按内容分配（见 tablefit.go），不再写死。
+	// 名称列前面多一个状态圆点和 6 DIP 间距，算需求时要加进去。
+	grid := make([][]string, len(rows))
+	for i, ct := range rows {
+		grid[i] = containerRowTexts(ct)
+	}
+	titles := []string{
+		locales.ContainersName(), locales.CommonStatus(), locales.NavImages(),
+		locales.CommonPort(), locales.ComposeProjects(),
+	}
+	cols, keep := buildColumns(c, tableWidth(c, &a.containerTableH), autoTable{
+		Titles: titles,
+		Floors: []float32{120, 80, 120, 80, 80},
+		Extra:  []float32{17},
+		// 不是 compose 启动的容器，「项目」整列都是破折号，地方不够时不必留着它。
+		DropTrivial: true,
+		Grid:        grid,
+	})
+	if cols == nil {
+		// 第一帧还量不到表格宽度：先用写死的值画一帧，下一帧就按内容分配。
+		cols = []ui.TableColumn{
+			{Title: titles[0], Width: 190, MinWidth: 120},
+			{Title: titles[1], Width: 110, MinWidth: 80},
+			{Title: titles[2], Width: 220, MinWidth: 120},
+			{Title: titles[3], Width: 160, MinWidth: 80},
+			{Title: titles[4], Width: 130, MinWidth: 80},
+		}
+		keep = []int{0, 1, 2, 3, 4}
 	}
 
 	// 用容器 ID 作为行的稳定标识，刷新时选中项跟着容器走。
@@ -187,7 +209,17 @@ func (a *App) containerTable(c *ui.Context, rows []wslc.Container) {
 			muted = t.Text
 		}
 
-		switch col {
+		// 列可能被收起（整列无信息），keep 把表格里的列号映回原来的列。
+		if col < 0 || col >= len(keep) {
+			return
+		}
+		orig := keep[col]
+		text := ""
+		if orig < len(grid[row]) {
+			text = grid[row][orig]
+		}
+
+		switch orig {
 		case 0:
 			// 名称前放一个状态圆点，用颜色区分运行/停止。
 			//
@@ -205,26 +237,21 @@ func (a *App) containerTable(c *ui.Context, rows []wslc.Container) {
 					dotColor = t.Warning
 				}
 				ui.Icon(c, icon("dot")).FontSize(11).TextColor(dotColor)
-				ui.Text(c, displayName(ct)).SingleLine()
+				ui.Text(c, text).SingleLine()
 			})
 		case 1:
 			color := muted
 			if ct.IsRunning() && !selected {
 				color = t.Success
 			}
-			ui.Text(c, ct.StateLabel()).SingleLine().TextColor(color)
+			ui.Text(c, text).SingleLine().TextColor(color)
 		case 2:
-			ui.Text(c, ct.Image).SingleLine().TextColor(muted)
-		case 3:
-			ui.Text(c, truncate(ct.Ports, 40)).SingleLine().TextColor(muted)
-		case 4:
-			proj := ct.Label("com.wslc-compose.project")
-			if proj == "" {
-				proj = "—"
-			}
-			ui.Text(c, proj).SingleLine().TextColor(muted)
+			ui.Text(c, text).SingleLine().TextColor(muted).Tooltip(text)
+		default:
+			// 端口、项目名：被截断时鼠标悬停能看到全文。
+			ui.Text(c, text).SingleLine().TextColor(muted).Tooltip(text)
 		}
-	}).Grow(1).Label(locales.ContainersTitle())
+	}).Grow(1).Label(locales.ContainersTitle()).Bind(&a.containerTableH)
 
 	// 双击行 = 打开日志
 	if table.Submitted() {
@@ -275,6 +302,24 @@ func displayName(ct wslc.Container) string {
 		return n
 	}
 	return ct.ID
+}
+
+// containerRowTexts 返回容器表某一行的各列文字。
+//
+// 量列宽和画单元格都用它，保证「量的」就是「画的」。名称列前面的状态圆点不算文字，
+// 它的宽度在 autoTable.Extra 里加。
+func containerRowTexts(ct wslc.Container) []string {
+	proj := ct.Label("com.wslc-compose.project")
+	if proj == "" {
+		proj = "—"
+	}
+	return []string{
+		displayName(ct),
+		ct.StateLabel(),
+		ct.Image,
+		truncate(ct.Ports, 40),
+		proj,
+	}
 }
 
 // containerAction 对容器执行生命周期动作。

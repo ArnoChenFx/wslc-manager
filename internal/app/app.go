@@ -154,6 +154,16 @@ type App struct {
 	// vmx 是虚拟机的状态与依赖，见 vmcard.go。
 	vmx vmState
 
+	// ---- 表格宽度 ----
+	// 表格自己占多宽，要问引擎上一帧的布局结果（tablefit.go 的 tableWidth）。
+	// 不能自己拿窗口宽度去减：表格在分栏里、还可能有内边距，减错了会算多，
+	// 算多就会把最后一列挤出可见范围。
+	containerTableH ui.Handle
+	serviceTableH   ui.Handle
+	imageTableH     ui.Handle
+	volumeTableH    ui.Handle
+	networkTableH   ui.Handle
+
 	// ---- 界面状态 ----
 	page        Page
 	query       string // 顶部搜索框

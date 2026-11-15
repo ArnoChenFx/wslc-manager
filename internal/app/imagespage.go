@@ -99,13 +99,34 @@ func (a *App) confirmDeleteImage(img wslc.Image) {
 func (a *App) imageTable(c *ui.Context, rows []wslc.Image) {
 	t := c.Theme()
 
-	cols := []ui.TableColumn{
-		{Title: locales.CommonRepository(), Width: 260, MinWidth: 140},
-		{Title: locales.CommonTags(), Width: 120, MinWidth: 70},
-		{Title: locales.ImagesId(), Width: 120, MinWidth: 90},
-		{Title: locales.CommonSize(), Width: 90, MinWidth: 60, Align: ui.End},
-		{Title: locales.CommonCreate(), Width: 130, MinWidth: 80},
-		{Title: locales.NavContainers(), Width: 70, MinWidth: 50, Align: ui.End},
+	// 列宽按内容分配（见 tablefit.go）。
+	grid := make([][]string, len(rows))
+	for i, img := range rows {
+		grid[i] = imageRowTexts(img)
+	}
+	titles := []string{
+		locales.CommonRepository(), locales.CommonTags(), locales.ImagesId(),
+		locales.CommonSize(), locales.CommonCreate(), locales.NavContainers(),
+	}
+	cols, keep := buildColumns(c, tableWidth(c, &a.imageTableH), autoTable{
+		Titles: titles,
+		Floors: []float32{140, 70, 90, 60, 80, 50},
+		Aligns: []ui.Align{0, 0, 0, ui.End, 0, ui.End},
+		// 悬空镜像的标签整列都是「—」，地方不够时不必留着它。
+		DropTrivial: true,
+		Grid:        grid,
+	})
+	if cols == nil {
+		// 第一帧还量不到表格宽度：先用写死的值画一帧，下一帧就按内容分配。
+		cols = []ui.TableColumn{
+			{Title: titles[0], Width: 260, MinWidth: 140},
+			{Title: titles[1], Width: 120, MinWidth: 70},
+			{Title: titles[2], Width: 120, MinWidth: 90},
+			{Title: titles[3], Width: 90, MinWidth: 60, Align: ui.End},
+			{Title: titles[4], Width: 130, MinWidth: 80},
+			{Title: titles[5], Width: 70, MinWidth: 50, Align: ui.End},
+		}
+		keep = []int{0, 1, 2, 3, 4, 5}
 	}
 
 	a.imageList.Key = func(i int) any {
@@ -123,35 +144,35 @@ func (a *App) imageTable(c *ui.Context, rows []wslc.Image) {
 		if row < 0 || row >= len(rows) {
 			return
 		}
-		img := rows[row]
 		// 选中行底色带强调色，次要文字需提亮才看得清。
 		muted := t.TextMuted
 		if a.imageList.CellSelected(row, col) {
 			muted = t.Text
 		}
-		switch col {
-		case 0:
-			repo := img.Repository
-			if img.Dangling() {
-				repo = "<none>"
-			}
-			ui.Text(c, repo).SingleLine()
-		case 1:
-			tag := img.Tag
-			if tag == "<none>" {
-				tag = "—"
-			}
-			ui.Text(c, tag).SingleLine().TextColor(muted)
-		case 2:
-			ui.Text(c, shortID(img.ID)).FontSize(12).TextColor(muted)
-		case 3:
-			ui.Text(c, img.Size).TextColor(muted)
-		case 4:
-			ui.Text(c, img.CreatedSince).TextColor(muted).SingleLine()
-		case 5:
-			ui.Text(c, img.Containers).TextColor(muted)
+		// 列可能被收起（整列无信息），keep 把表格里的列号映回原来的列。
+		if col < 0 || col >= len(keep) {
+			return
 		}
-	}).Grow(1).Label(locales.ImagesTitle())
+		orig := keep[col]
+		if orig >= len(grid[row]) {
+			return
+		}
+		text := grid[row][orig]
+		switch orig {
+		case 0:
+			ui.Text(c, text).SingleLine()
+		case 1:
+			ui.Text(c, text).SingleLine().TextColor(muted)
+		case 2:
+			ui.Text(c, text).FontSize(12).TextColor(muted)
+		case 3:
+			ui.Text(c, text).TextColor(muted)
+		case 4:
+			ui.Text(c, text).TextColor(muted).SingleLine().Tooltip(text)
+		default:
+			ui.Text(c, text).TextColor(muted)
+		}
+	}).Grow(1).Label(locales.ImagesTitle()).Bind(&a.imageTableH)
 
 	table.ContextMenu(func(m *ui.Menu) {
 		if a.imageSel < 0 || a.imageSel >= len(rows) {
@@ -498,4 +519,19 @@ func (a *App) imagePullDialog(c *ui.Context) {
 			}
 		})
 	})
+}
+
+// imageRowTexts 返回镜像表某一行的各列文字。
+//
+// 量列宽和画单元格都用它，保证「量的」就是「画的」。
+func imageRowTexts(img wslc.Image) []string {
+	repo := img.Repository
+	if img.Dangling() {
+		repo = "<none>"
+	}
+	tag := img.Tag
+	if tag == "<none>" {
+		tag = "—"
+	}
+	return []string{repo, tag, shortID(img.ID), img.Size, img.CreatedSince, img.Containers}
 }

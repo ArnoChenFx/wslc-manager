@@ -389,6 +389,46 @@ func (a *App) projectActions(c *ui.Context, p compose.Project, busy bool, state 
 	})
 }
 
+// serviceRowTexts 返回服务表某一行的各列文字。
+//
+// 量列宽和画单元格都用它，保证“量的”就是“画的”。
+func serviceRowTexts(p compose.Project, name string) []string {
+	svc := p.Config.Services[name]
+
+	image := svc.Image
+	if svc.Build != nil {
+		if image != "" {
+			image += locales.ComposeLocalBuild()
+		} else {
+			image = locales.ComposeBuildContextValue(orDefault(svc.Build.Context, "."))
+		}
+	}
+	if image == "" {
+		image = "—"
+	}
+
+	ports := make([]string, 0, len(svc.Ports))
+	for _, pm := range svc.Ports {
+		ports = append(ports, pm.String())
+	}
+	portText := strings.Join(ports, ", ")
+	if portText == "" {
+		portText = "—"
+	}
+
+	depends := strings.Join(svc.DependsOn, ", ")
+	if depends == "" {
+		depends = "—"
+	}
+
+	replicas := svc.Replicas
+	if replicas == 0 {
+		replicas = 1
+	}
+
+	return []string{name, image, portText, depends, fmt.Sprint(replicas)}
+}
+
 // serviceTable 绘制项目中的服务定义。
 func (a *App) serviceTable(c *ui.Context, p compose.Project) {
 	t := c.Theme()
@@ -400,16 +440,44 @@ func (a *App) serviceTable(c *ui.Context, p compose.Project) {
 		return
 	}
 
-	cols := []ui.TableColumn{
-		// 详情区默认只有约 678（1180 窗口），要同时容纳服务表和
-		// 启动选项栏。第一栏默认 400，列宽总和必须控制在 400 以内，
-		// 否则最后一列会被压成 0 宽（曾实测「副本数」列宽 = 0）。
-		// 分隔条可拖动，想看更宽的服务表可以自己拉。
-		{Title: locales.ComposeServices(), Width: 96, MinWidth: 56},
-		{Title: locales.ContainersImage(), MinWidth: 84},
-		{Title: locales.CommonPort(), Width: 96, MinWidth: 52},
-		{Title: locales.CommonDependsOn(), Width: 72, MinWidth: 40},
-		{Title: locales.CommonReplicas(), Width: 40, MinWidth: 30, Align: ui.End},
+	// 列宽按内容分配（见 tablefit.go）：先量出每列要多少，再按分隔条的实际宽度分。
+	// 分隔条可拖动，所以每个窗口宽度下都会重新算。
+	grid := make([][]string, len(names))
+	for i, name := range names {
+		grid[i] = serviceRowTexts(p, name)
+	}
+	titles := []string{
+		locales.ComposeServices(),
+		locales.ContainersImage(),
+		locales.CommonPort(),
+		locales.CommonDependsOn(),
+		locales.CommonReplicas(),
+	}
+	// 用表格自己的实际宽度，而不是分栏的设定值：分栏在极端的比例下会被压缩
+	// （右边那一栏有最小宽度），拿设定值算会多算，列宽一溢出最后一列就被挤出可见范围。
+	avail := tableWidth(c, &a.serviceTableH)
+	if avail <= 0 {
+		avail = a.composeListWidth
+	}
+	cols, keep := buildColumns(c, avail, autoTable{
+		Titles: titles,
+		// 保底：就算内容很短，也别把这五列挤成一条缝。
+		Floors: []float32{56, 84, 52, 40, 30},
+		Aligns: []ui.Align{0, 0, 0, 0, ui.End},
+		// 地方不够时，收起满列的“—”与默认的“1”，把宽度留给镜像。
+		DropTrivial: true,
+		Grid:        grid,
+	})
+	if cols == nil {
+		// 还没量到宽度（例如页脚刚建好）：用固定值先画一帧，下一帧就按内容分配。
+		cols = []ui.TableColumn{
+			{Title: titles[0], Width: 96, MinWidth: 56},
+			{Title: titles[1], MinWidth: 84},
+			{Title: titles[2], Width: 96, MinWidth: 52},
+			{Title: titles[3], Width: 72, MinWidth: 40},
+			{Title: titles[4], Width: 40, MinWidth: 30, Align: ui.End},
+		}
+		keep = []int{0, 1, 2, 3, 4}
 	}
 
 	a.serviceList.Key = func(i int) any {
@@ -427,48 +495,25 @@ func (a *App) serviceTable(c *ui.Context, p compose.Project) {
 		if row < 0 || row >= len(names) {
 			return
 		}
-		name := names[row]
-		svc := p.Config.Services[name]
-		switch col {
-		case 0:
-			ui.Text(c, name).Bold().SingleLine()
-		case 1:
-			text := svc.Image
-			if svc.Build != nil {
-				if text != "" {
-					text += locales.ComposeLocalBuild()
-				} else {
-					text = locales.ComposeBuildContextValue(orDefault(svc.Build.Context, "."))
-				}
-			}
-			if text == "" {
-				text = "—"
-			}
-			ui.Text(c, text).SingleLine().TextColor(t.TextMuted)
-		case 2:
-			ports := make([]string, 0, len(svc.Ports))
-			for _, pm := range svc.Ports {
-				ports = append(ports, pm.String())
-			}
-			txt := strings.Join(ports, ", ")
-			if txt == "" {
-				txt = "—"
-			}
-			ui.Text(c, txt).SingleLine().TextColor(t.TextMuted)
-		case 3:
-			txt := strings.Join(svc.DependsOn, ", ")
-			if txt == "" {
-				txt = "—"
-			}
-			ui.Text(c, txt).SingleLine().TextColor(t.TextMuted)
-		case 4:
-			n := svc.Replicas
-			if n == 0 {
-				n = 1
-			}
-			ui.Text(c, fmt.Sprint(n)).TextColor(t.TextMuted)
+		if col < 0 || col >= len(keep) {
+			return
 		}
-	}).Grow(1).Label(locales.ComposeServiceList())
+		// 列可能被收起，keep 把表格里的列号映回原来的列。
+		orig := keep[col]
+		if orig >= len(grid[row]) {
+			return
+		}
+		// 文字和量宽度时用的是同一份（serviceRowTexts），不会出现“量的和画的不一样”。
+		text := grid[row][orig]
+		switch orig {
+		case 0:
+			ui.Text(c, text).Bold().SingleLine()
+		case 4:
+			ui.Text(c, text).TextColor(t.TextMuted)
+		default:
+			ui.Text(c, text).SingleLine().TextColor(t.TextMuted).Tooltip(text)
+		}
+	}).Grow(1).Label(locales.ComposeServiceList()).Bind(&a.serviceTableH)
 
 	if table.Submitted() {
 		if a.serviceSel >= 0 && a.serviceSel < len(names) {

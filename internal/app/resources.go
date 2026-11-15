@@ -48,10 +48,24 @@ func (a *App) volumesPage(c *ui.Context) {
 
 		ui.Divider(c)
 
-		cols := []ui.TableColumn{
-			{Title: locales.CommonName(), Width: 280, MinWidth: 140},
-			{Title: locales.CommonDriver(), Width: 90, MinWidth: 60},
-			{Title: locales.VolumesMountPoint(), MinWidth: 160},
+		// 列宽按内容分配（见 tablefit.go）。
+		grid := make([][]string, len(rows))
+		for i, v := range rows {
+			grid[i] = volumeRowTexts(v)
+		}
+		volTitles := []string{locales.CommonName(), locales.CommonDriver(), locales.VolumesMountPoint()}
+		cols, keep := buildColumns(c, tableWidth(c, &a.volumeTableH), autoTable{
+			Titles: volTitles,
+			Floors: []float32{140, 60, 160},
+			Grid:   grid,
+		})
+		if cols == nil {
+			cols = []ui.TableColumn{
+				{Title: volTitles[0], Width: 280, MinWidth: 140},
+				{Title: volTitles[1], Width: 90, MinWidth: 60},
+				{Title: volTitles[2], MinWidth: 160},
+			}
+			keep = []int{0, 1, 2}
 		}
 
 		a.volumeList.Key = func(i int) any {
@@ -69,21 +83,22 @@ func (a *App) volumesPage(c *ui.Context) {
 			if row < 0 || row >= len(rows) {
 				return
 			}
-			v := rows[row]
 			// 选中行底色带强调色，次要文字需提亮才看得清。
 			muted := t.TextMuted
 			if a.volumeList.CellSelected(row, col) {
 				muted = t.Text
 			}
-			switch col {
+			orig := keep[col]
+			switch orig {
 			case 0:
-				ui.Text(c, v.Name).SingleLine()
+				ui.Text(c, grid[row][orig]).SingleLine()
 			case 1:
-				ui.Text(c, v.Driver).TextColor(muted)
-			case 2:
-				ui.Text(c, v.Mountpoint).SingleLine().TextColor(muted).FontSize(12)
+				ui.Text(c, grid[row][orig]).TextColor(muted)
+			default:
+				// 挂载点很长，被截断时鼠标悬停能看到全文。
+				ui.Text(c, grid[row][orig]).SingleLine().TextColor(muted).FontSize(12).Tooltip(grid[row][orig])
 			}
-		}).Grow(1).Label(locales.VolumesTitle()).ContextMenu(func(m *ui.Menu) {
+		}).Grow(1).Label(locales.VolumesTitle()).Bind(&a.volumeTableH).ContextMenu(func(m *ui.Menu) {
 			if a.volumeSel < 0 || a.volumeSel >= len(rows) {
 				return
 			}
@@ -172,12 +187,29 @@ func (a *App) networksPage(c *ui.Context) {
 
 		ui.Divider(c)
 
-		cols := []ui.TableColumn{
-			{Title: locales.CommonName(), Width: 300, MinWidth: 140},
-			{Title: locales.CommonDriver(), Width: 100, MinWidth: 60},
-			{Title: locales.NetworksId(), Width: 120, MinWidth: 90},
-			{Title: locales.CommonType(), Width: 90, MinWidth: 60},
-			{Title: locales.ImagesCreated(), MinWidth: 140},
+		// 列宽按内容分配（见 tablefit.go）。
+		grid := make([][]string, len(rows))
+		for i, n := range rows {
+			grid[i] = networkRowTexts(n)
+		}
+		netTitles := []string{
+			locales.CommonName(), locales.CommonDriver(), locales.NetworksId(),
+			locales.CommonType(), locales.ImagesCreated(),
+		}
+		cols, keep := buildColumns(c, tableWidth(c, &a.networkTableH), autoTable{
+			Titles: netTitles,
+			Floors: []float32{140, 60, 90, 60, 140},
+			Grid:   grid,
+		})
+		if cols == nil {
+			cols = []ui.TableColumn{
+				{Title: netTitles[0], Width: 300, MinWidth: 140},
+				{Title: netTitles[1], Width: 100, MinWidth: 60},
+				{Title: netTitles[2], Width: 120, MinWidth: 90},
+				{Title: netTitles[3], Width: 90, MinWidth: 60},
+				{Title: netTitles[4], MinWidth: 140},
+			}
+			keep = []int{0, 1, 2, 3, 4}
 		}
 
 		a.networkList.Key = func(i int) any {
@@ -195,29 +227,27 @@ func (a *App) networksPage(c *ui.Context) {
 			if row < 0 || row >= len(rows) {
 				return
 			}
-			n := rows[row]
 			// 选中行底色带强调色，次要文字需提亮才看得清。
+			// （这里以前误用了 volumeList.CellSelected，导致网络表选中行的次要文字不会提亮。）
 			muted := t.TextMuted
-			if a.volumeList.CellSelected(row, col) {
+			if a.networkList.CellSelected(row, col) {
 				muted = t.Text
 			}
-			switch col {
+			orig := keep[col]
+			text := grid[row][orig]
+			switch orig {
 			case 0:
-				ui.Text(c, n.Name).SingleLine()
+				ui.Text(c, text).SingleLine()
 			case 1:
-				ui.Text(c, n.Driver).TextColor(muted)
+				ui.Text(c, text).TextColor(muted)
 			case 2:
-				ui.Text(c, shortID(n.ID)).FontSize(12).TextColor(muted)
+				ui.Text(c, text).FontSize(12).TextColor(muted)
 			case 3:
-				kind := locales.CommonCustom()
-				if n.IsBuiltin() {
-					kind = locales.CommonBuiltin()
-				}
-				ui.Text(c, kind).TextColor(muted)
-			case 4:
-				ui.Text(c, n.CreatedAt).SingleLine().TextColor(muted).FontSize(12)
+				ui.Text(c, text).TextColor(muted)
+			default:
+				ui.Text(c, text).SingleLine().TextColor(muted).FontSize(12)
 			}
-		}).Grow(1).Label(locales.NetworksTitle()).ContextMenu(func(m *ui.Menu) {
+		}).Grow(1).Label(locales.NetworksTitle()).Bind(&a.networkTableH).ContextMenu(func(m *ui.Menu) {
 			if a.networkSel < 0 || a.networkSel >= len(rows) {
 				return
 			}
@@ -267,4 +297,20 @@ func (a *App) filteredNetworks() []wslc.Network {
 		}
 	}
 	return out
+}
+
+// volumeRowTexts 返回卷表某一行的各列文字。
+//
+// 量列宽和画单元格都用它，保证「量的」就是「画的」。
+func volumeRowTexts(v wslc.Volume) []string {
+	return []string{v.Name, v.Driver, v.Mountpoint}
+}
+
+// networkRowTexts 返回网络表某一行的各列文字。
+func networkRowTexts(n wslc.Network) []string {
+	kind := locales.CommonCustom()
+	if n.IsBuiltin() {
+		kind = locales.CommonBuiltin()
+	}
+	return []string{n.Name, n.Driver, shortID(n.ID), kind, n.CreatedAt}
 }

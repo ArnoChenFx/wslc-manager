@@ -117,6 +117,11 @@ cmd/wslc-compose  → 命令行版 Compose：只依赖 compose / composert / wsl
   加在外层容器上）。单个 `Text` 上的 `Selectable()` 选区只停留在该段落内，
   每行各一个 `Text` 就复制不了多行。
 - 表格选中行会被填强调色，行内次级文字须切到 `AccentText`。
+- **表格列宽不要写死。** 用 `tablefit.go` 的 `buildColumns` 按内容分配：先 `MeasureText`
+  量出表头和最长内容，再按表格**实际宽度**（`tableWidth(c, &handle)`，不是分栏的设定值）
+  分配。写死的列宽加起来超过表格宽度时，最后一列会被挤成一条缝、窄列的表头被截成「副…」
+  （真实截图为证）。新增列要给它一个 `Floors` 保底，并把 `keep` 映射用在渲染回调里
+  （空间不够时`DropTrivial` 会收起整列无信息的列）。
 - 同一 `Row` 里各子块的行数要一致，否则基线错位。
 - 文字行里的装饰圆点用 `ui.Icon`，不要用裸 `Box`。
 - `ui.Divider` 在 `Row` 中是横线；竖分隔条用 `Width(1)` 的 `Box`。
