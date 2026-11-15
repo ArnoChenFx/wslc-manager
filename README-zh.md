@@ -34,6 +34,8 @@
 
 已支持：`up` / `down` / `start` / `stop` / `restart` / `pull` / `build`，`depends_on` 条件（`service_healthy`、`service_completed_successfully`），健康检查，多网络（别名、静态 IP），基于文件的 secrets 与 configs，`scale`，以及 dry-run 预览。某个服务启动失败不会连累其他服务，只有依赖它的服务会被跳过。
 
+compose 文件与 `.env` 可以直接在应用里查看和编辑：选中项目后点「编辑文件」。编辑器带 YAML 高亮、行号、折叠和查找替换；保存会保留文件原本的换行符与权限。点「新建项目」可以从零建一个：选目录、写 Compose 内容、（可选）写 `.env`，写盘前先检查 YAML 语法。不会覆盖任何已有文件——目录必须是空的或者还不存在。
+
 `wslc` 做不到的设置（`privileged`、`devices`、`sysctls`、`always` / `no` 之外的重启策略等）会给出警告并被忽略；会悄悄出错的用法（匿名卷、外部或非文件来源的 secret、IPv6 网络）会在创建任何东西之前被拒绝。
 
 同一个引擎也提供独立的[命令行工具](#命令行工具)。

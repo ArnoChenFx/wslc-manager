@@ -63,6 +63,13 @@ func (a *App) projectListPane(c *ui.Context) {
 	ui.Column(c).FillHeight().FillWidth().Children(func() {
 		ui.Row(c).Padding(8, 10).Gap(6).AlignItems(ui.Center).Children(func() {
 			ui.Text(c, locales.ComposeProjects()).FontSize(12).Bold().TextColor(t.TextMuted).Grow(1)
+			// 「新建」与「添加」并列放在最前面：两者都是「搞一个新项目进来」，
+			// 区别只在项目文件已经存在还是由我们生成。
+			// 「新建」用文字按钮（信息量比图标大），「添加」「扫描」保持图标，
+			// 三者的主次关系一眼能分清。
+			if ui.Button(c, locales.ComposeNew()).Tooltip(locales.ComposeNewTooltip()).Clicked() {
+				a.openNewProject()
+			}
 			if ui.Button(c, "").Label(locales.ComposeAdd()).Tooltip(locales.ComposeAddTooltip()).Children(func() {
 				ui.Icon(c, icon("plus")).FontSize(14)
 			}).Clicked() {
@@ -70,7 +77,10 @@ func (a *App) projectListPane(c *ui.Context) {
 				a.addProjectPath = ""
 			}
 			if ui.Button(c, "").Label(locales.ComposeScan()).Tooltip(locales.ComposeScanTooltip()).Children(func() {
-				ui.Icon(c, icon("search")).FontSize(14)
+				// 用刷新图标而不是放大镜：这个动作是「重新扫一遍根目录」，
+				// 没有搜索框也没有搜索语义，画放大镜会让人以为它是过滤/搜索
+				// （用户截图指出过）。同一排里已有「+」用于添加，两者不会混。
+				ui.Icon(c, icon("refresh")).FontSize(14)
 			}).Clicked() {
 				a.DiscoverProjects()
 			}
@@ -215,8 +225,19 @@ func (a *App) projectDetail(c *ui.Context) {
 		// 用户无法调整两栏比例。服务表列多、选项栏文字长，
 		// 固定比例总有一边不合适（曾经把描述挤成 "Equival / ent to"）。
 		//
-		// *size 是第一栏（服务表）的宽度，会被 Split 限制在
-		// 距两端各 40 DIP 之内，拖出去也不会把另一栏挤没。
+		// *size 是第一栏（服务表）的宽度。
+		//
+		// 注意：Split 只在一个方向做保护——拖动时它用 fitSplit 把位置
+		// 限在可用空间内，但**它不会把已存的超大值改小**，而是直接拿这个值
+		// 给第一栏（length(a, *size) 配 Shrink(1)），结果第二栏被压成零宽：
+		// 控件仍会画，每行却只放得下一个字，屏幕上看到的是整列竖排的单字。
+		// 实测：settings 里存了 879，详情区只有 723 时，「启动选项」整栏
+		// 变成一条竖线。（这个值是我自己拖出来的，但用户完全可能碰到：
+		// 在宽窗口拖到很宽，再在窄窗口打开。）
+		//
+		// 所以每次画之前先按当前窗口夹一次，并写回字段：
+		// 让 Split 与「记住的位置」同时收敛，否则下一帧又会变回去。
+		a.composeListWidth = a.clampComposeListWidth(a.composeListWidth)
 		split := ui.Split(c, &a.composeListWidth, func() {
 			ui.Column(c).FillHeight().Children(func() {
 				a.serviceTable(c, *p)
@@ -228,8 +249,14 @@ func (a *App) projectDetail(c *ui.Context) {
 		}).Grow(1).FillWidth().SplitReset(400)
 
 		// 拖动结束后记住位置，下次打开保持。
+		//
+		// 存之前先按当前窗口夹一次上限：拖动时引擎已经用 fitSplit 把位置
+		// 限在可用空间内，但用户可能拖得很宽再关掉应用，下次在更小的窗口
+		// 或更窄的侧边栏下打开，这个绝对值就会超出可用宽度。
+		// 结果不是「右侧窄一点」，而是被挤成零宽：每行只放得下一个字，
+		// 「启动选项」整栏变成竖排的一列（真实截图为证）。
 		if split.Changed() {
-			a.settings.ComposeListWidth = a.composeListWidth
+			a.settings.ComposeListWidth = a.clampComposeListWidth(a.composeListWidth)
 			a.saveSettings()
 		}
 	})
@@ -263,14 +290,66 @@ func (a *App) projectHeader(c *ui.Context, p compose.Project) {
 			}
 		})
 
-		// ── 操作行：按钮 ─────────────────────────────
+		// ── 操作行：按钮，右侧小结文件信息 ────────────────
+		//
+		// 两者合到同一行，而不是各占一行：详情区在默认窗口下只有六七百宽，
+		// 而「文件名 + 编辑文件」单独一行时右侧会空出大片无用的空白
+		// （用户截图为证，指着那块空白要求「放到右边去，省下空间」）。
+		//
+		// 用 SpaceBetween 两端对齐，而不是中间插一个 Spacer：
+		// Spacer 只有 Grow、没有 Shrink（`coreSpacer` = `Box.Grow(1)`），
+		// 空间不够时它不会缩到 0，反而把后面那组一步一步推到窗口外
+		// （实测 860 宽下「编辑文件」x=867，整个跑到窗口之外）。
+		// SpaceBetween 把剩余的空白分到中间，空间不够时各组按自己的
+		// Shrink 收缩，不会溢出。
+		// SpaceBetween 把剩余的空白分到中间；空间不够时它也会压缩子元素，
+		// 但不会凭空变出宽度——所以窄窗口下必须靠隐藏文件名减少需求，
+		// 光靠对齐方式不够（实测 900 宽时按钮仍超出 4 DIP）。
 		busy := a.composeBusy(p.Dir)
 		state := a.projectRuntimeOf(p)
-		a.projectActions(c, p, busy, state)
+		// 同一套宽度判断决定两件事：文件名显不显示、重启按钮留在主行还是收到菜单里。
+		// 用一个函数算一次，避免两处各自判断而互相矛盾（比如文件名藏了、
+		// 重启却还占着位置，于是按钮仍被推出窗口）。
+		detail := a.detailWidth(c)
+		ui.Row(c).Gap(10).AlignItems(ui.Center).Justify(ui.SpaceBetween).
+			Shrink(1).Children(func() {
+			a.projectActions(c, p, busy, state, detail >= 560)
+			a.projectFileInfo(c, p, detail)
+		})
+	})
+}
 
-		// ── 文件信息行 ───────────────────────────────
-		ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {
-			files := p.Config.ComposeFiles
+// projectFileInfo 绘制「文件：… / env: … / 编辑文件」，靠右显示。
+//
+// 文件名只在窗口够宽时显示：窄窗口下这一行要同时装下六个按钮，
+// 再塞文件名就会被挤到窗口外（实测 900 宽时「编辑文件」x=768、宽 106，
+// 超出窗口边界）。所以窄窗口只留「编辑文件」按钮，
+// 文件信息改放按钮的 tooltip 里——用户悬停能看到，不会丢信息。
+func (a *App) projectFileInfo(c *ui.Context, p compose.Project, detail float32) {
+	t := c.Theme()
+
+	// 用详情区的可用宽度决定能否显示文件名（由调用方算好传进来，
+	// 免得同一帧里对同一个数做两次判断）。560 是实测值：
+	// 五个按钮（含重启）+ 超过半行留给文件名的总需求。
+	// 取不到尺寸时（测试早期）按「不显示」处理：宁可少一行文字，
+	// 也不能把按钮推出窗口。
+	showNames := detail >= 560
+
+	ui.Row(c).Gap(8).AlignItems(ui.Center).Shrink(1).Children(func() {
+		files := p.Config.ComposeFiles
+		// 文件名的 tooltip 总是准备着，无论文字是否显示。
+		var nameHint string
+		if len(files) > 0 {
+			nameHint = strings.Join(files, "\n")
+		}
+		if p.Config.EnvFile != nil && *p.Config.EnvFile != "" {
+			if nameHint != "" {
+				nameHint += "\n"
+			}
+			nameHint += "env: " + *p.Config.EnvFile
+		}
+
+		if showNames {
 			if len(files) > 0 {
 				ui.Text(c, locales.ComposeFiles(joinNames(files))).FontSize(11).
 					TextColor(t.TextMuted).SingleLine().Shrink(1).Selectable().
@@ -281,8 +360,40 @@ func (a *App) projectHeader(c *ui.Context, p compose.Project) {
 					TextColor(t.TextMuted).SingleLine().Shrink(1).Selectable().
 					Tooltip(*p.Config.EnvFile)
 			}
-		})
+		}
+
+		// 不参与压缩：它是最容易因为窗口窄而消失的东西，而它正是这一行的重点。
+		btn := ui.Button(c, locales.ComposeEditFiles()).Shrink(0)
+		if showNames {
+			btn = btn.Tooltip(locales.ComposeEditFilesHint())
+		} else if nameHint != "" {
+			// 文件名被藏起来了，就把它们放到按钮的 tooltip 里。
+			btn = btn.Tooltip(locales.ComposeEditFilesHint() + "\n\n" + nameHint)
+		} else {
+			btn = btn.Tooltip(locales.ComposeEditFilesHint())
+		}
+		btn.Children(func() { ui.Icon(c, icon("edit")).FontSize(14) })
+		if btn.Clicked() {
+			a.openEditor(p.Dir)
+		}
 	})
+}
+
+// detailWidth 返回项目详情区可用的宽度。
+//
+// = 窗口宽 - 侧边栏 - 项目列表栏 - 两条分隔条。
+// 这些值都能从 App 当前状态直接算出来，不需要去量上一帧的几何：
+// 算出来的值在本帧就可用，不会因为「上一帧还没画过」而拿到 0。
+func (a *App) detailWidth(c *ui.Context) float32 {
+	winW, _ := c.Size()
+	if winW <= 0 {
+		winW, _ = a.viewSize()
+	}
+	if winW <= 0 {
+		return 0
+	}
+	// 两条分隔条各 1 DIP，加上两侧内边距，留 40 的固定余量。
+	return winW - a.sidebarW - a.composeProjectsWidth - 40
 }
 
 // projectActions 绘制项目的操作按钮行。
@@ -293,10 +404,11 @@ func (a *App) projectHeader(c *ui.Context, p compose.Project) {
 //   - 没有容器：移除不可用
 //
 // 这样按钮「灰掉」本身就是信息，用户不必点一次才知道。
-func (a *App) projectActions(c *ui.Context, p compose.Project, busy bool, state projectRuntime) {
+func (a *App) projectActions(c *ui.Context, p compose.Project, busy bool, state projectRuntime, showRestart bool) {
 	t := c.Theme()
 
-	ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+	// 自成一组：外层用 SpaceBetween 两端对齐，靠一组「不压缩」的 Shrink(1) 兜底。
+	ui.Row(c).Gap(8).AlignItems(ui.Center).Shrink(1).Children(func() {
 		// 启动
 		upBtn := ui.PrimaryButton(c, locales.ComposeStart()).
 			Tooltip(locales.ComposeStartTooltip()).
@@ -326,14 +438,20 @@ func (a *App) projectActions(c *ui.Context, p compose.Project, busy bool, state 
 		}
 
 		// 重启
-		restartBtn := ui.Button(c, locales.ComposeRestart()).
-			Tooltip(locales.ComposeRestartTooltip()).
-			Disabled(busy || state.None())
-		if state.None() {
-			restartBtn.Tooltip(locales.ComposeNotRunning())
-		}
-		if restartBtn.Clicked() && !busy && !state.None() {
-			a.composeAction(p, compose.ActionRestart, locales.ComposeRestarted(p.Name))
+		//
+		// 窄窗口下不画在主行：六个按钮加「编辑文件」在最小窗口（900）
+		// 需要约 452 而详情区只有约 360，硬放会把右侧按钮推出窗口。
+		// 它不会消失——「更多」菜单里总有这一项。
+		if showRestart {
+			restartBtn := ui.Button(c, locales.ComposeRestart()).
+				Tooltip(locales.ComposeRestartTooltip()).
+				Disabled(busy || state.None())
+			if state.None() {
+				restartBtn.Tooltip(locales.ComposeNotRunning())
+			}
+			if restartBtn.Clicked() && !busy && !state.None() {
+				a.composeAction(p, compose.ActionRestart, locales.ComposeRestarted(p.Name))
+			}
 		}
 
 		vSep(c)
@@ -365,6 +483,13 @@ func (a *App) projectActions(c *ui.Context, p compose.Project, busy bool, state 
 		more := ui.Button(c, "").Label(locales.CommonMore()).Tooltip(locales.CommonMoreActions())
 		more.Children(func() { ui.Icon(c, icon("settings")).FontSize(14) })
 		more.PopoverMenuButton(func(m *ui.Menu) {
+			// 窄窗口下主行放不下「重启」，但功能不能少：这里总有一个入口。
+			// （宽窗口下主行已经有它，这里再列一次也不算多余：
+			// 菜单是「所有动作」的清单，不该随窗口宽度变。）
+			if m.Item(locales.ComposeRestart()).Disabled(busy || state.None()).Chosen() &&
+				!busy && !state.None() {
+				a.composeAction(p, compose.ActionRestart, locales.ComposeRestarted(p.Name))
+			}
 			if m.Item(locales.ImagesPullTitle()).Chosen() {
 				a.composeAction(p, compose.ActionPull, locales.ComposePulled(p.Name))
 			}
@@ -1030,3 +1155,71 @@ func joinNames(paths []string) string {
 	}
 	return strings.Join(names, ", ")
 }
+
+// 详情区右侧的「启动选项」栏至少要留这么宽。
+//
+// 数字是量出来的，不是拍的：这一栏里最长的一行是项目路径
+// （`E:\Project\wslc\open-compute` 英文约 187 DIP），其余是
+// 「等价于 down -v，会丢数据」（约 167）和开关标签（约 70）。
+// 加上左右内边距 20，210 就能让每一行都不折行。
+//
+// 早先写的是 320，用户截图指出「最小宽度还是有点太宽了，浪费空间」：
+// 右栏比内容宽出一大截，白白挤掉了服务表的列宽（那里正缺地方）。
+// 取 220 留 10 DIP 余量，换字体或系统缩放时不会立刻折行。
+const composeOptionsMinWidth float32 = 220
+
+// clampComposeListWidth 把「服务表 / 启动选项」的分隔位置限制在当前窗口能容下的范围。
+//
+// 为什么需要：分隔位置是以 DIP 存的绝对值，写进设置后跨会话保留。
+// 用户在宽窗口里把它拖到右边，再在窄窗口打开，这个值就可能超过整个详情区的宽度，
+// 右栏于是被压成零宽——看到的是一列竖排单字，而不是「布局有点挤」。
+// ui.Split 自己只保证拖动的那一刻不越界，不负责纠正已存的值。
+//
+// 窗口尺寸不可知时（构建期或测试里没给尺寸）原样返回，不做无根据的缩减。
+func (a *App) clampComposeListWidth(w float32) float32 {
+	winW, _ := a.viewSize()
+	if winW <= 0 {
+		return w
+	}
+	// 详情区可用宽度 = 窗口 - 侧边栏 - 项目列表 - 两条分隔条与内边距的余量。
+	// 用一个保守的固定余量而不是逐一重算各分隔条：这里是防「明显越界」，
+	// 不需要精确到像素，留点余量反而更安全。
+	avail := winW - a.sidebarW - a.composeProjectsWidth - 40
+	if avail <= 0 {
+		return w
+	}
+	maxList := avail - composeOptionsMinWidth
+	if maxList < 120 {
+		// 窗口窄到连两栏的最小宽度都放不下：把大部分给服务表，
+		// 它至少有表头可读；选项栏再窄也能看到开关本身。
+		maxList = avail * 0.6
+	}
+	if w > maxList {
+		return maxList
+	}
+	if w < 0 {
+		return 0
+	}
+	return w
+}
+
+// viewSize 返回最近一帧的窗口尺寸。
+//
+// 取的是表格句柄记录的上一帧矩形：不需要额外字段，也能在视图构建期拿到
+// 「这一帧真实可用的宽度」。窗口不在了或还没画过时返回 0。
+func (a *App) viewSize() (width, height float32) {
+	// 测试没有真实窗口，用 override 给出尺寸；生产环境永远走 a.win。
+	if a.sizeOverride[0] > 0 {
+		return a.sizeOverride[0], a.sizeOverride[1]
+	}
+	if a.win == nil {
+		return 0, 0
+	}
+	w, h := a.win.Size()
+	return float32(w), float32(h)
+}
+
+// 测试里没有真实窗口，用这个字段给出「窗口尺寸」。
+//
+// 生产代码不用它：a.win 在真实运行时总是存在。但布局上限的测试必须能指定
+// 窗口大小，否则「窄窗口下右栏不该被压成零宽」这类断言根本无从写起。

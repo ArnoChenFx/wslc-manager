@@ -1936,6 +1936,108 @@ func (msgs Messages) ComposeReload() string {
 	return Catalog.Format(msgs.locale, "composeReload", nil)
 }
 
+// ComposeEditFiles says "编辑文件"
+// in the language the app shows.
+func ComposeEditFiles() string { return In(i18n.Locale()).ComposeEditFiles() }
+
+// ComposeEditFiles says "编辑文件"
+// in the language of msgs.
+func (msgs Messages) ComposeEditFiles() string {
+	return Catalog.Format(msgs.locale, "composeEditFiles", nil)
+}
+
+// ComposeEditFilesHint says "compose.yaml、override 与 .env"
+// in the language the app shows.
+func ComposeEditFilesHint() string { return In(i18n.Locale()).ComposeEditFilesHint() }
+
+// ComposeEditFilesHint says "compose.yaml、override 与 .env"
+// in the language of msgs.
+func (msgs Messages) ComposeEditFilesHint() string {
+	return Catalog.Format(msgs.locale, "composeEditFilesHint", nil)
+}
+
+// ComposeEditorTitle says "编辑项目文件"
+// in the language the app shows.
+func ComposeEditorTitle() string { return In(i18n.Locale()).ComposeEditorTitle() }
+
+// ComposeEditorTitle says "编辑项目文件"
+// in the language of msgs.
+func (msgs Messages) ComposeEditorTitle() string {
+	return Catalog.Format(msgs.locale, "composeEditorTitle", nil)
+}
+
+// ComposeEditorNoFiles says "这个目录里没有可编辑的文件。"
+// in the language the app shows.
+func ComposeEditorNoFiles() string { return In(i18n.Locale()).ComposeEditorNoFiles() }
+
+// ComposeEditorNoFiles says "这个目录里没有可编辑的文件。"
+// in the language of msgs.
+func (msgs Messages) ComposeEditorNoFiles() string {
+	return Catalog.Format(msgs.locale, "composeEditorNoFiles", nil)
+}
+
+// ComposeEditorSaveHint says "Ctrl+S 保存"
+// in the language the app shows.
+func ComposeEditorSaveHint() string { return In(i18n.Locale()).ComposeEditorSaveHint() }
+
+// ComposeEditorSaveHint says "Ctrl+S 保存"
+// in the language of msgs.
+func (msgs Messages) ComposeEditorSaveHint() string {
+	return Catalog.Format(msgs.locale, "composeEditorSaveHint", nil)
+}
+
+// ComposeEditorSaved says "已保存 {name}"
+// in the language the app shows.
+func ComposeEditorSaved(name string) string { return In(i18n.Locale()).ComposeEditorSaved(name) }
+
+// ComposeEditorSaved says "已保存 {name}"
+// in the language of msgs.
+func (msgs Messages) ComposeEditorSaved(name string) string {
+	return Catalog.Format(msgs.locale, "composeEditorSaved", map[string]any{"name": name})
+}
+
+// ComposeEditorDiscardTitle says "放弃未保存的改动？"
+// in the language the app shows.
+func ComposeEditorDiscardTitle() string { return In(i18n.Locale()).ComposeEditorDiscardTitle() }
+
+// ComposeEditorDiscardTitle says "放弃未保存的改动？"
+// in the language of msgs.
+func (msgs Messages) ComposeEditorDiscardTitle() string {
+	return Catalog.Format(msgs.locale, "composeEditorDiscardTitle", nil)
+}
+
+// ComposeEditorDiscardBody says "下列文件的改动尚未保存，关闭后会丢失：{files}"
+// in the language the app shows.
+func ComposeEditorDiscardBody(files string) string {
+	return In(i18n.Locale()).ComposeEditorDiscardBody(files)
+}
+
+// ComposeEditorDiscardBody says "下列文件的改动尚未保存，关闭后会丢失：{files}"
+// in the language of msgs.
+func (msgs Messages) ComposeEditorDiscardBody(files string) string {
+	return Catalog.Format(msgs.locale, "composeEditorDiscardBody", map[string]any{"files": files})
+}
+
+// ComposeEditorMissing says "（尚未创建）"
+// in the language the app shows.
+func ComposeEditorMissing() string { return In(i18n.Locale()).ComposeEditorMissing() }
+
+// ComposeEditorMissing says "（尚未创建）"
+// in the language of msgs.
+func (msgs Messages) ComposeEditorMissing() string {
+	return Catalog.Format(msgs.locale, "composeEditorMissing", nil)
+}
+
+// ComposeEditorReloadHint says "文件已被外部修改，重新打开可载入最新内容。"
+// in the language the app shows.
+func ComposeEditorReloadHint() string { return In(i18n.Locale()).ComposeEditorReloadHint() }
+
+// ComposeEditorReloadHint says "文件已被外部修改，重新打开可载入最新内容。"
+// in the language of msgs.
+func (msgs Messages) ComposeEditorReloadHint() string {
+	return Catalog.Format(msgs.locale, "composeEditorReloadHint", nil)
+}
+
 // ComposeCopyDir says "复制目录路径"
 // in the language the app shows.
 func ComposeCopyDir() string { return In(i18n.Locale()).ComposeCopyDir() }
@@ -4846,4 +4948,104 @@ func VmDetectBroken() string { return In(i18n.Locale()).VmDetectBroken() }
 // in the language of msgs.
 func (msgs Messages) VmDetectBroken() string {
 	return Catalog.Format(msgs.locale, "vmDetectBroken", nil)
+}
+
+// ComposeNewTitle says "新建 Compose 项目"
+// in the language the app shows.
+func ComposeNewTitle() string { return In(i18n.Locale()).ComposeNewTitle() }
+
+// ComposeNewTitle says "新建 Compose 项目"
+// in the language of msgs.
+func (msgs Messages) ComposeNewTitle() string {
+	return Catalog.Format(msgs.locale, "composeNewTitle", nil)
+}
+
+// ComposeNewDir says "项目目录"
+// in the language the app shows.
+func ComposeNewDir() string { return In(i18n.Locale()).ComposeNewDir() }
+
+// ComposeNewDir says "项目目录"
+// in the language of msgs.
+func (msgs Messages) ComposeNewDir() string {
+	return Catalog.Format(msgs.locale, "composeNewDir", nil)
+}
+
+// ComposeNewDirHint says "必须是不存在的路径或空目录；默认在你设置的扫描根目录下。不会覆盖任何已有文件。"
+// in the language the app shows.
+func ComposeNewDirHint() string { return In(i18n.Locale()).ComposeNewDirHint() }
+
+// ComposeNewDirHint says "必须是不存在的路径或空目录；默认在你设置的扫描根目录下。不会覆盖任何已有文件。"
+// in the language of msgs.
+func (msgs Messages) ComposeNewDirHint() string {
+	return Catalog.Format(msgs.locale, "composeNewDirHint", nil)
+}
+
+// ComposeNewDirPlaceholder says "例如 E:Projectmyapp"
+// in the language the app shows.
+func ComposeNewDirPlaceholder() string { return In(i18n.Locale()).ComposeNewDirPlaceholder() }
+
+// ComposeNewDirPlaceholder says "例如 E:Projectmyapp"
+// in the language of msgs.
+func (msgs Messages) ComposeNewDirPlaceholder() string {
+	return Catalog.Format(msgs.locale, "composeNewDirPlaceholder", nil)
+}
+
+// ComposeNewDirBrowse says "选择一个父目录，自动在其中新建项目目录"
+// in the language the app shows.
+func ComposeNewDirBrowse() string { return In(i18n.Locale()).ComposeNewDirBrowse() }
+
+// ComposeNewDirBrowse says "选择一个父目录，自动在其中新建项目目录"
+// in the language of msgs.
+func (msgs Messages) ComposeNewDirBrowse() string {
+	return Catalog.Format(msgs.locale, "composeNewDirBrowse", nil)
+}
+
+// ComposeNewCreated says "已创建项目 {name}"
+// in the language the app shows.
+func ComposeNewCreated(name string) string { return In(i18n.Locale()).ComposeNewCreated(name) }
+
+// ComposeNewCreated says "已创建项目 {name}"
+// in the language of msgs.
+func (msgs Messages) ComposeNewCreated(name string) string {
+	return Catalog.Format(msgs.locale, "composeNewCreated", map[string]any{"name": name})
+}
+
+// ComposeNew says "新建项目"
+// in the language the app shows.
+func ComposeNew() string { return In(i18n.Locale()).ComposeNew() }
+
+// ComposeNew says "新建项目"
+// in the language of msgs.
+func (msgs Messages) ComposeNew() string {
+	return Catalog.Format(msgs.locale, "composeNew", nil)
+}
+
+// ComposeNewTooltip says "从零创建一个 compose 项目"
+// in the language the app shows.
+func ComposeNewTooltip() string { return In(i18n.Locale()).ComposeNewTooltip() }
+
+// ComposeNewTooltip says "从零创建一个 compose 项目"
+// in the language of msgs.
+func (msgs Messages) ComposeNewTooltip() string {
+	return Catalog.Format(msgs.locale, "composeNewTooltip", nil)
+}
+
+// ComposeNewComposeHint says "将写入 项目目录/compose.yaml。保存前会检查 YAML 语法。"
+// in the language the app shows.
+func ComposeNewComposeHint() string { return In(i18n.Locale()).ComposeNewComposeHint() }
+
+// ComposeNewComposeHint says "将写入 项目目录/compose.yaml。保存前会检查 YAML 语法。"
+// in the language of msgs.
+func (msgs Messages) ComposeNewComposeHint() string {
+	return Catalog.Format(msgs.locale, "composeNewComposeHint", nil)
+}
+
+// ComposeNewEnvHint says "将写入 项目目录/.env，compose.yaml 里可用 $ 加变量名的写法引用。留空则不创建该文件。"
+// in the language the app shows.
+func ComposeNewEnvHint() string { return In(i18n.Locale()).ComposeNewEnvHint() }
+
+// ComposeNewEnvHint says "将写入 项目目录/.env，compose.yaml 里可用 $ 加变量名的写法引用。留空则不创建该文件。"
+// in the language of msgs.
+func (msgs Messages) ComposeNewEnvHint() string {
+	return Catalog.Format(msgs.locale, "composeNewEnvHint", nil)
 }

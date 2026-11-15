@@ -17,6 +17,7 @@ import (
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
+	"github.com/egoist/mygo/ui/editor"
 
 	"github.com/arno/wslc-manager/internal/compose"
 	"github.com/arno/wslc-manager/internal/composert"
@@ -203,6 +204,9 @@ type App struct {
 	// composeProjectsWidth 是「项目列表 / 项目详情」之间分隔条的宽度
 	// （项目列表那一侧）。可拖动，并写入设置。
 	composeProjectsWidth float32
+	// sizeOverride 只在测试里用来指定窗口尺寸（生产代码总是走 win.Size）。
+	// 布局上限的测试必须能控制窗口大小，否则无从断言。
+	sizeOverride [2]float32
 	// outputLines 是流式输出已收到的行数，用于状态提示。
 	outputLines int
 	// outputScroll 保存输出面板的滚动位置，配合 FollowEnd 让新行自动可见。
@@ -227,6 +231,32 @@ type App struct {
 
 	addProjectOpen bool
 	addProjectPath string
+
+	// ---- 文件编辑器（compose.yaml / .env）----
+	// editorOpen 控制对话框是否显示；editorFiles 是本次打开的文件集合，
+	// 每个文件带自己的 Buffer（撤销历史）与编辑器状态（光标、滚动）。
+	editorOpen         bool
+	editorFiles        []editorFile
+	editorTab          int
+	editorProjectDir   string
+	editorFocusPending bool
+	// editorViewH 绑定当前编辑器，用在切标签后把键盘焦点抢过来。
+	editorViewH ui.Handle
+
+	// ---- 新建项目对话框 ----
+	// 内容直接用应用自带的代码编辑器写，所以这里持有两个缓冲区与它们的编辑器状态。
+	// 不用「项目名/镜像/端口」这类表单：用户总要改内容，直接给编辑器更省事。
+	newProjectOpen         bool
+	newProjectDir          string
+	newProjectCompose      *editor.Buffer
+	newProjectComposeState *editor.State
+	newProjectEnv          *editor.Buffer
+	newProjectEnvState     *editor.State
+	newProjectTab          int
+	newProjectError        string
+	newProjectFocusPending bool
+	// newProjectEditorH 绑定当前标签的编辑器，用作切标签后的焦点目标。
+	newProjectEditorH ui.Handle
 
 	// 设置对话框里的临时文本字段。
 	pollSecondsText string

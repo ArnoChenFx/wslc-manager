@@ -38,6 +38,8 @@ Settings that `wslc` cannot honour (`privileged`, `devices`, `sysctls`, restart 
 
 The same engine is also available as a standalone [command-line tool](#command-line-tool).
 
+compose files and `.env` can be opened and edited in the app: select a project and click **Edit files**. The editor has YAML highlighting, line numbers, folding and find-and-replace; saving keeps the file's own line endings and permissions. **New project** creates one from scratch — pick a directory, write the Compose file and (optionally) the `.env`, and the YAML syntax is checked before anything is written. Nothing is ever overwritten: the directory must be empty or not exist yet.
+
 ### System
 Environment versions, WSL sessions, and a one-click check that can install or update WSL when `wslc` is missing.
 

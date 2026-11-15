@@ -50,6 +50,25 @@ cmd/wslc-compose  → 命令行版 Compose：只依赖 compose / composert / wsl
 界面展示用的 `compose.Project` / `ServiceConfig` 是 compose-go 模型的精简投影（`view.go`），
 不要把 compose-go 的类型穿透到 `internal/app`。
 
+## 关于编辑 compose 文件
+
+用户可以在界面里改 `compose.yaml`（含 override）与 `.env`，也可以从零新建项目。
+
+- 文件 IO 只在 `internal/compose/files.go`、`create.go`；界面不做磁盘操作。
+- 写文件一律走 `compose.WriteEditable`：它保留原换行符与权限位、原子替换。
+  直接用 `os.WriteFile` 会把整个 CRLF 文件的行尾改掉，diff 里全是噪声。
+- 「哪些文件可编辑」先问加载器（`ComposeFiles`），加载失败时退回按命名约定探测——
+  YAML 写坏的时候恰恰最需要打开文件。
+- 编辑器用 MyGo 自带的 `ui/editor`。**切标签后必须 `Handle.Focus(c)`**：
+  `AutoFocus` 只在元素首次入树时生效，切标签时它已在树上，不会重新抢焦点。
+  `.env` 要显式 `LanguageNamed("Shell")`（MyGo 没有 dotenv 语言）。
+- **Modal 里面不要用 `Grow(1)` 让控件占满剩余高度**：Modal 面板按内容收缩，
+  没有剩余高度可分，实测编辑器得到 height=0、看上去一片空白。要给确定高度。
+- 新建项目只接受三个输入：目录、compose 内容、`.env` 内容。不要加项目名 / 镜像 /
+  端口这类参数——用户在编辑器里写的内容就是要跑的东西，参数只是在替用户做决定。
+- 新建时目录非空必须拒绝；写盘前只查 YAML **语法**（带行号），语义交给加载器。
+- 失败原因要留在对话框里、对话框不能关：用户刚写的内容还在，照着报错改就行。
+
 ## 关于 compose 引擎
 
 编排（up/down/start/…）由本仓库自己实现，不依赖任何外部编排工具。

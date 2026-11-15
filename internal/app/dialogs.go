@@ -13,6 +13,8 @@ import (
 func (a *App) dialogs(c *ui.Context) {
 	a.confirmDialog(c)
 	a.addProjectDialog(c)
+	a.newProjectDialog(c)
+	a.editorDialog(c)
 	a.settingsDialog(c)
 }
 
