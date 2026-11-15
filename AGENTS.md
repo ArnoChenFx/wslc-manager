@@ -24,6 +24,8 @@ internal/wslvm    → 只在宿主机一侧观测会话的虚拟机（vmmem 进�
 internal/composert → 把 wslc.Client 适配成 compose.Runtime（图形界面与命令行共用）
 cmd/wslc-compose  → 命令行版 Compose：只依赖 compose / composert / wslc，
                     **不 import internal/app，也不 import MyGo**
+cmd/promo         → 宣传片渲染工具：经 internal/app 的演示模式（demo.go）画应用真实的界面，
+                    用 MyGo 的 render 插件输出视频；只在需要宣传素材时手动跑，不参与应用的发布
 ```
 
 - **内部包不允许反向依赖 `internal/app`。**
@@ -90,6 +92,44 @@ cmd/wslc-compose  → 命令行版 Compose：只依赖 compose / composert / wsl
   所以 `internal/selfupdate/release_test.go` 会校验变量名没写错。
 - 发布流程里的构建、打包、校验和、上传，以及 CI 里的冒烟步骤，都有契约测试守着。
 
+## 关于宣传片
+
+`cmd/promo` 用 MyGo 的 `render` 插件，把应用**真实的界面**渲染成宣传片（中英两版）。窗口里不是仿制品，
+是应用的根视图（`App.View`），所以界面一改、重新跑一遍，宣传片就跟着变。
+
+```sh
+go run ./cmd/promo                      # 两个版本 → dist/promo/（dist/ 不入库）
+go run ./cmd/promo -lang en             # 只渲染英文版
+go run ./cmd/promo -lang en -frame 450  # 只导出第 450 帧（PNG），调画面用
+go run ./cmd/promo -preview -lang en   # 在窗口里播放（没有声音）
+go run ./cmd/promo -webp docs/media    # 同时生成 README 顶部的预览动图（需要 ffmpeg）
+```
+
+- **演示模式（`internal/app/demo.go`）是应用对它开的唯一一扇门。** 它不经过 `Init`：wslc、Compose 引擎、设置文件、
+  依赖体检、更新插件一概不碰，数据全由调用方给。演示数据一律虚构（`D:\dev\shop` 这类路径、`shop-web-1` 这类容器名），
+  **不得出现本机的真实路径、容器、用户名**。
+- **剧情是（时刻，语言）的纯函数**（`timeline.go`）：不读时钟、不记前一帧、不读全局语言（词条用 `locales.In(语言)` 显式取）。
+  渲染会把所有帧先构建一遍来混音，预览拖动还会再构建，同一帧每次必须得到同一份场景。
+  状态栏「更新于」这类要显示时间的地方用写死的时间，并且用 `time.Local`：更新卡片会把时间转成本地时区，写成 UTC 会和状态栏差出时区小时数。
+- **英文版从头到尾都是英文界面**，不在结尾切成中文；中文版结尾会切到英文演示双语。
+  「界面没有汉字」由 `internal/app` 的 `TestEnglishInterfaceHasNoChinese` 和 `cmd/promo` 的 `TestEnglishVideoHasNoChinese` 守着。
+  发现英文界面里有写死的中文，改成走 `locales`，不要在宣传片里绕开它（容器状态列就是这样被抓到的）。
+  测试里渲染英文界面要同时设两个语言：`i18n.SetLocaleFunc`（应用自己的词条）和 `Tester.SetLocale`
+  （MyGo 自带控件的文字，比如分隔条的无障碍标签），少设一个就会假报或漏报。
+- **时间表在 `cue.go`，画面和声音共用**。每个时刻都是 `grid`（半拍，0.35 秒）的整数倍，动作音才和音乐合拍；
+  改的时候数格子，不要直接改秒数（`TestCuesAreOnTheGridAndInOrder` 会拦）。
+- 窗口嵌在比自己大的画布里时，`c.Size()` 量的是整块画布。凡是要问「窗口多宽」的地方用 `App.viewSize()`
+  （演示实例的尺寸来自 `NewDemo(width, height)`），不要直接问 `c.Size()`。
+- 窗口宽度用应用的默认窗口宽度 1180，**不要为了版面去拖分隔条、收窄侧边栏**：英文版会被截断（试过）。
+- 配乐是合成的（`audio.go`），没有素材文件；噪声用固定种子，不要用 `math/rand`（每次渲染的声音必须一样）。
+  **声音没法在开发环境里「听」**，只靠数值把关（峰值、RMS、有无削波），改动后请人耳过一遍。
+- **README 顶部放的是 `docs/media/promo-*.webp`（循环播放的预览），不是视频。** GitHub 只会播放经网页编辑器上传
+  （生成 `user-attachments` 地址）的视频，仓库里提交的 mp4 和 Release 资产都播放不了，`<video>` 标签还会被过滤；
+  而「上传」要经过用户的 GitHub 账号，不是本地命令能做的。界面改了之后重新跑 `-webp docs/media`，再提交这两个文件。
+  WebP 质量不要低于 80：动画 WebP 是帧间增量编码，有损误差逐帧累积，q70 在暗色背景上会出块状残影（对比过）。
+  预览的起止点在 `cue.go`（`previewFrom` / `previewTo`）：第一帧必须是完整画面，有些地方只显示动图的第一帧。
+- 验证：`go test ./cmd/promo`；`ffprobe` 看成片的编码、时长、帧数；`-frame N` 导出帧用眼睛看。
+
 ## 测试要求
 
 改动这些地方必须补测试：
@@ -104,6 +144,8 @@ cmd/wslc-compose  → 命令行版 Compose：只依赖 compose / composert / wsl
 | 命令行（选项映射、输出流、退出码） | 假引擎（`cmd/wslc-compose/cli_test.go`）；`config` 这类不需要 wslc 的命令用真实引擎 + 一旦被调用就失败的 `Runtime` |
 | 更新配置 / 发布流程（`mygo.json`、`release.yml`） | 契约测试：解析文件断言约定，见 `internal/selfupdate/release_test.go` |
 | 虚拟机的状态与刷新门控 | `wslctest` 假 wslc 记录命令 + `fakeHost` 假宿主机，断言「没有发出会叫醒虚拟机的命令」，见 `internal/app/vmgate_test.go` |
+| 宣传片（剧情、时间表、声音、语言版本） | 纯函数断言，再做变异验证，见 `cmd/promo/promo_test.go` |
+| 演示模式（用真实视图渲染假数据） | `ui.Tester` 渲染后数文字，见 `internal/app/demo_test.go` |
 | 崩溃/死锁类修复 | 必须补回归测试，注释写明崩溃现象 |
 
 回归测试的注释要写明**它防的是什么缺陷**，例如：

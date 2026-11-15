@@ -12,6 +12,10 @@ Built with **Go** and [MyGo](https://github.com/egoist/mygo)'s native UI: no web
   <a href="README-zh.md">中文文档</a>
 </p>
 
+<p align="center">
+  <img src="docs/media/promo-en.webp" width="860" alt="WSLC Manager in 30 seconds: containers, images, Compose projects and the virtual machine in one native window">
+</p>
+
 ---
 
 ## What it does
@@ -115,6 +119,16 @@ go build -o wslc-compose.exe ./cmd/wslc-compose   # the command-line tool
 ```
 
 Requires Go 1.25 or newer.
+
+### Promo video
+
+`cmd/promo` renders the app's own interface into a promo video, in English and in Chinese. The window in the video is not a mock-up: it is the app's real views, fed with made-up data (no `wslc`, nothing from your machine), so a regenerated video follows the interface.
+
+```powershell
+go run ./cmd/promo                   # both versions → dist/promo/
+go run ./cmd/promo -lang en          # English only
+go run ./cmd/promo -webp docs/media  # also remake the looping preview at the top of this README (needs ffmpeg)
+```
 
 ---
 

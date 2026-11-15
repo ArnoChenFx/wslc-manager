@@ -12,6 +12,10 @@
   <a href="README.md">English</a>
 </p>
 
+<p align="center">
+  <img src="docs/media/promo-zh.webp" width="860" alt="30 秒看完 WSLC Manager：容器、镜像、Compose 项目和虚拟机，都在同一个原生窗口里">
+</p>
+
 ---
 
 ## 它能做什么
@@ -115,6 +119,16 @@ go build -o wslc-compose.exe ./cmd/wslc-compose   # 命令行工具
 ```
 
 需要 Go 1.25 或更高版本。
+
+### 宣传片
+
+`cmd/promo` 把应用自己的界面渲染成一段宣传片，有中文版和英文版。画面里的窗口不是仿制品：用的就是应用真实的视图，数据是虚构的（不连 `wslc`，也不含你本机的任何东西），所以界面改了、重新生成一遍，视频就跟着变。
+
+```powershell
+go run ./cmd/promo                   # 两个版本 → dist/promo/
+go run ./cmd/promo -lang en          # 只渲染英文版
+go run ./cmd/promo -webp docs/media  # 同时重做本 README 顶部的循环预览（需要 ffmpeg）
+```
 
 ---
 
