@@ -153,3 +153,18 @@ func TestPluralForms(t *testing.T) {
 		t.Errorf("0 个标签应使用 =0 分支: %q", zero)
 	}
 }
+
+// TestPullButtonIsAnAction 是「拉取镜像」按钮文案的回归测试。
+//
+// 缺陷现象：镜像页工具栏第一个按钮在中文里是「拉取镜像…」（动作加省略号，点开对话框），
+// 英文却译成了 "Pulling image…"——进行时，读起来像「正在拉取」，而这个按钮平时是空闲的。
+// 这类错误词表测试看不出来（不空、没有汉字、占位符都对），是渲染英文版宣传片时看画面才发现的。
+func TestPullButtonIsAnAction(t *testing.T) {
+	en := locales.In("en").ImagesPulling()
+	if strings.HasPrefix(en, "Pulling") {
+		t.Errorf("按钮是动作，不是进度，不该是进行时: %q", en)
+	}
+	if !strings.HasSuffix(en, "…") {
+		t.Errorf("点开对话框的按钮要带省略号: %q", en)
+	}
+}

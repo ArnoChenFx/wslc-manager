@@ -1028,6 +1028,86 @@ func (msgs Messages) ContainersHideStopped() string {
 	return Catalog.Format(msgs.locale, "containersHideStopped", nil)
 }
 
+// ContainersStateRunning says "运行中"
+// in the language the app shows.
+func ContainersStateRunning() string { return In(i18n.Locale()).ContainersStateRunning() }
+
+// ContainersStateRunning says "运行中"
+// in the language of msgs.
+func (msgs Messages) ContainersStateRunning() string {
+	return Catalog.Format(msgs.locale, "containersStateRunning", nil)
+}
+
+// ContainersStateHealthy says "运行中（健康）"
+// in the language the app shows.
+func ContainersStateHealthy() string { return In(i18n.Locale()).ContainersStateHealthy() }
+
+// ContainersStateHealthy says "运行中（健康）"
+// in the language of msgs.
+func (msgs Messages) ContainersStateHealthy() string {
+	return Catalog.Format(msgs.locale, "containersStateHealthy", nil)
+}
+
+// ContainersStateUnhealthy says "运行中（不健康）"
+// in the language the app shows.
+func ContainersStateUnhealthy() string { return In(i18n.Locale()).ContainersStateUnhealthy() }
+
+// ContainersStateUnhealthy says "运行中（不健康）"
+// in the language of msgs.
+func (msgs Messages) ContainersStateUnhealthy() string {
+	return Catalog.Format(msgs.locale, "containersStateUnhealthy", nil)
+}
+
+// ContainersStateStopped says "已停止"
+// in the language the app shows.
+func ContainersStateStopped() string { return In(i18n.Locale()).ContainersStateStopped() }
+
+// ContainersStateStopped says "已停止"
+// in the language of msgs.
+func (msgs Messages) ContainersStateStopped() string {
+	return Catalog.Format(msgs.locale, "containersStateStopped", nil)
+}
+
+// ContainersStateCreated says "已创建"
+// in the language the app shows.
+func ContainersStateCreated() string { return In(i18n.Locale()).ContainersStateCreated() }
+
+// ContainersStateCreated says "已创建"
+// in the language of msgs.
+func (msgs Messages) ContainersStateCreated() string {
+	return Catalog.Format(msgs.locale, "containersStateCreated", nil)
+}
+
+// ContainersStatePaused says "已暂停"
+// in the language the app shows.
+func ContainersStatePaused() string { return In(i18n.Locale()).ContainersStatePaused() }
+
+// ContainersStatePaused says "已暂停"
+// in the language of msgs.
+func (msgs Messages) ContainersStatePaused() string {
+	return Catalog.Format(msgs.locale, "containersStatePaused", nil)
+}
+
+// ContainersStateRestarting says "重启中"
+// in the language the app shows.
+func ContainersStateRestarting() string { return In(i18n.Locale()).ContainersStateRestarting() }
+
+// ContainersStateRestarting says "重启中"
+// in the language of msgs.
+func (msgs Messages) ContainersStateRestarting() string {
+	return Catalog.Format(msgs.locale, "containersStateRestarting", nil)
+}
+
+// ContainersStateUnknown says "未知"
+// in the language the app shows.
+func ContainersStateUnknown() string { return In(i18n.Locale()).ContainersStateUnknown() }
+
+// ContainersStateUnknown says "未知"
+// in the language of msgs.
+func (msgs Messages) ContainersStateUnknown() string {
+	return Catalog.Format(msgs.locale, "containersStateUnknown", nil)
+}
+
 // ContainersStart says "启动选中的容器"
 // in the language the app shows.
 func ContainersStart() string { return In(i18n.Locale()).ContainersStart() }
@@ -1282,10 +1362,18 @@ func (msgs Messages) ImagesPullPlaceholder() string {
 
 // ImagesPulling says "拉取镜像…"
 // in the language the app shows.
+//
+// Label of the Images page button that opens the pull-image dialog. An
+// action (imperative, with an ellipsis because it opens a dialog), not a
+// progress message: in English "Pull image…", not "Pulling image…".
 func ImagesPulling() string { return In(i18n.Locale()).ImagesPulling() }
 
 // ImagesPulling says "拉取镜像…"
 // in the language of msgs.
+//
+// Label of the Images page button that opens the pull-image dialog. An
+// action (imperative, with an ellipsis because it opens a dialog), not a
+// progress message: in English "Pull image…", not "Pulling image…".
 func (msgs Messages) ImagesPulling() string {
 	return Catalog.Format(msgs.locale, "imagesPulling", nil)
 }

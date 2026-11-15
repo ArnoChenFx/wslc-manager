@@ -95,6 +95,14 @@
   "containersEmptyTitle": "没有容器",
   "containersEmptyBody": "从 Compose 项目启动一组服务，或拉取镜像后手动运行",
   "containersHideStopped": "隐藏已停止",
+  "containersStateRunning": "运行中",
+  "containersStateHealthy": "运行中（健康）",
+  "containersStateUnhealthy": "运行中（不健康）",
+  "containersStateStopped": "已停止",
+  "containersStateCreated": "已创建",
+  "containersStatePaused": "已暂停",
+  "containersStateRestarting": "重启中",
+  "containersStateUnknown": "未知",
   "containersStart": "启动选中的容器",
   "containersStop": "停止选中的容器",
   "containersRestart": "重启选中的容器",
@@ -288,6 +296,9 @@
   },
   "@appTagline": {
     "description": "One-line description under the product name."
+  },
+  "@imagesPulling": {
+    "description": "Label of the Images page button that opens the pull-image dialog. An action (imperative, with an ellipsis because it opens a dialog), not a progress message: in English \"Pull image…\", not \"Pulling image…\"."
   },
   "@navResources": {
     "description": "Sidebar section header grouping containers, images, volumes and networks."

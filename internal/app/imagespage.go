@@ -106,7 +106,7 @@ func (a *App) imageTable(c *ui.Context, rows []wslc.Image) {
 	}
 	titles := []string{
 		locales.CommonRepository(), locales.CommonTags(), locales.ImagesId(),
-		locales.CommonSize(), locales.CommonCreate(), locales.NavContainers(),
+		locales.CommonSize(), locales.ImagesCreated(), locales.NavContainers(),
 	}
 	cols, keep := buildColumns(c, tableWidth(c, &a.imageTableH), autoTable{
 		Titles: titles,

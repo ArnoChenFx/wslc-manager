@@ -6,6 +6,7 @@ import (
 	"math"
 	"strings"
 
+	"github.com/egoist/mygo/i18n"
 	"github.com/egoist/mygo/ui"
 
 	"github.com/arno/wslc-manager/internal/wslc"
@@ -315,10 +316,48 @@ func containerRowTexts(ct wslc.Container) []string {
 	}
 	return []string{
 		displayName(ct),
-		ct.StateLabel(),
+		stateLabel(ct),
 		ct.Image,
 		truncate(ct.Ports, 40),
 		proj,
+	}
+}
+
+// stateLabel 返回容器状态在界面上的文案，随界面语言变化。
+//
+// 早先这段文案写死在 wslc 包里、只有中文，英文界面的「状态」列也是「运行中」「已停止」——
+// 宣传片渲染英文版时才暴露出来。wslc 包只封装命令行，不该持有面向用户的文案。
+func stateLabel(ct wslc.Container) string {
+	return stateLabelIn(locales.In(i18n.Locale()), ct)
+}
+
+// stateLabelIn 按给定语言的词条返回容器状态文案。
+//
+// 单独分出带语言参数的版本，是为了测试能直接对比中英两种语言，而不去改全局语言。
+func stateLabelIn(m locales.Messages, ct wslc.Container) string {
+	switch strings.ToLower(ct.State) {
+	case "running":
+		// 健康检查的结果比「运行中」更有信息，有就带上。
+		switch ct.Health {
+		case "unhealthy":
+			return m.ContainersStateUnhealthy()
+		case "healthy":
+			return m.ContainersStateHealthy()
+		}
+		return m.ContainersStateRunning()
+	case "exited":
+		return m.ContainersStateStopped()
+	case "created":
+		return m.ContainersStateCreated()
+	case "paused":
+		return m.ContainersStatePaused()
+	case "restarting":
+		return m.ContainersStateRestarting()
+	case "":
+		return m.ContainersStateUnknown()
+	default:
+		// 没见过的状态原样显示：比编一个可能不对的翻译更诚实。
+		return ct.State
 	}
 }
 

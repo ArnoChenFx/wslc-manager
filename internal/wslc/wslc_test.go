@@ -77,27 +77,28 @@ func TestContainerLabel(t *testing.T) {
 	}
 }
 
+// TestContainerState 只验证「是否在运行」的判断。
+//
+// 面向用户的状态文案（运行中 / 已停止……）不在这一层：它要随界面语言变化，
+// 由 internal/app 的 stateLabel 负责，并在那里测试。
+// 早先这里直接返回写死的中文，英文界面的状态列也是中文。
 func TestContainerState(t *testing.T) {
 	tests := []struct {
 		state  string
 		health string
-		want   string
 		docker bool
 	}{
-		{"running", "", "运行中", true},
-		{"running", "healthy", "运行中（健康）", true},
-		{"running", "unhealthy", "运行中（不健康）", true},
-		{"exited", "", "已停止", false},
-		{"created", "", "已创建", false},
-		{"paused", "", "已暂停", false},
-		{"", "", "未知", false},
-		{"weird", "", "weird", false},
+		{"running", "", true},
+		{"running", "healthy", true},
+		{"running", "unhealthy", true},
+		{"exited", "", false},
+		{"created", "", false},
+		{"paused", "", false},
+		{"", "", false},
+		{"weird", "", false},
 	}
 	for _, tc := range tests {
 		c := Container{State: tc.state, Health: tc.health}
-		if got := c.StateLabel(); got != tc.want {
-			t.Errorf("State=%q Health=%q → %q, want %q", tc.state, tc.health, got, tc.want)
-		}
 		if c.IsRunning() != tc.docker {
 			t.Errorf("State=%q IsRunning=%v, want %v", tc.state, c.IsRunning(), tc.docker)
 		}

@@ -40,33 +40,6 @@ func (c Container) IsRunning() bool { return strings.EqualFold(c.State, "running
 // IsPaused 判断容器是否被暂停。
 func (c Container) IsPaused() bool { return strings.EqualFold(c.State, "paused") }
 
-// StateLabel 返回给用户看的状态文案（中文）。
-func (c Container) StateLabel() string {
-	s := strings.ToLower(c.State)
-	switch s {
-	case "running":
-		if c.Health == "unhealthy" {
-			return "运行中（不健康）"
-		}
-		if c.Health == "healthy" {
-			return "运行中（健康）"
-		}
-		return "运行中"
-	case "exited":
-		return "已停止"
-	case "created":
-		return "已创建"
-	case "paused":
-		return "已暂停"
-	case "restarting":
-		return "重启中"
-	case "":
-		return "未知"
-	default:
-		return c.State
-	}
-}
-
 // Label 读取容器标签。wslc 把标签编码成 "k1=v1,k2=v2" 的单个字符串，
 // 但值本身可能包含逗号（例如 compose 的 metadata JSON），所以这里做
 // 简单的贪婪匹配：只在遇到下一个 "token=" 形态时才分割。
