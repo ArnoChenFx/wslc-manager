@@ -385,7 +385,15 @@ func (a *App) projectFileInfo(c *ui.Context, p compose.Project, detail float32) 
 // 这些值都能从 App 当前状态直接算出来，不需要去量上一帧的几何：
 // 算出来的值在本帧就可用，不会因为「上一帧还没画过」而拿到 0。
 func (a *App) detailWidth(c *ui.Context) float32 {
-	winW, _ := c.Size()
+	// 给了窗口尺寸（演示模式、测试）就以它为准，和 clampComposeListWidth 用同一个来源。
+	//
+	// 不能优先用 c.Size()：应用被嵌在比自己大的画布里时（宣传片里窗口只占画布中间一块），
+	// c.Size() 量的是整块画布。应用会以为自己有很宽，选了「宽窗口」的布局分支（显示文件名、
+	// 重启按钮），实际却放不下，按钮就叠在了一起。真实运行时没有 sizeOverride，行为不变。
+	winW := a.sizeOverride[0]
+	if winW <= 0 {
+		winW, _ = c.Size()
+	}
 	if winW <= 0 {
 		winW, _ = a.viewSize()
 	}
